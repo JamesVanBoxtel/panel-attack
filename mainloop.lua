@@ -1,7 +1,7 @@
+require("match")
 require("panels")
 require("theme")
 require("click_menu")
-require("scores")
 local select_screen = require("select_screen")
 local replay_browser = require("replay_browser")
 local options = require("options")
@@ -10,7 +10,7 @@ local analytics = require("analytics")
 
 local wait, resume = coroutine.yield, coroutine.resume
 
-local playground, main_endless, make_main_puzzle, main_net_vs_setup, main_config_input, main_select_puzz, main_local_vs_setup, main_set_name, main_local_vs_yourself_setup, main_options, main_music_test, main_replay_browser, exit_game
+local main_endless, make_main_puzzle, main_net_vs_setup, main_config_input, main_select_puzz, main_local_vs_setup, main_set_name, main_local_vs_yourself_setup, main_options, main_music_test, main_replay_browser, exit_game
 -- main_select_mode, main_dumb_transition, main_net_vs, main_net_vs_lobby, main_local_vs_yourself, main_local_vs, main_replay_endless, main_replay_puzzle, main_replay_vs are not local since they are also used elsewhere
 
 local PLAYING = "playing" -- room states
@@ -46,8 +46,6 @@ function fmainloop()
   gprint("Reading config file", unpack(main_menu_screen_pos))
   wait()
   read_conf_file()
-  print("Reading scores file")
-  read_score_file()
   local x, y, display = love.window.getPosition()
   love.window.setPosition(config.window_x or x, config.window_y or y, config.display or display)
   love.window.setFullscreen(config.fullscreen or false)
@@ -132,10 +130,9 @@ do
 
     match_type_message = ""
     local items = {
-      --{"playground", main_select_speed_99, {playground}},
-      {loc("mm_1_endless"), main_select_speed_99, {main_endless}},
+      {loc("mm_1_endless"), main_endless_setup},
       {loc("mm_1_puzzle"), main_select_puzz},
-      {loc("mm_1_time"), main_select_speed_99, {main_time_attack}},
+      {loc("mm_1_time"), main_timeattack_setup},
       {loc("mm_1_vs"), main_local_vs_yourself_setup},
       --{loc("mm_2_vs_online", "burke.ro"), main_net_vs_setup, {"burke.ro"}},
       {loc("mm_2_vs_online", "Jon's server"), main_net_vs_setup, {"18.188.43.50"}},
@@ -219,6 +216,16 @@ do
   end
 end
 
+function main_endless_setup()
+  GAME.match = Match("endless")
+  return unpack({main_select_speed_99, {main_endless}})
+end
+
+function main_timeattack_setup()
+  GAME.match = Match("time")
+  return unpack({main_select_speed_99, {main_time_attack}})
+end
+
 function main_select_speed_99(next_func, ...)
   local difficulties = {"Easy", "Normal", "Hard", "EX Mode"}
   local loc_difficulties = {loc("easy"), loc("normal"), loc("hard"), "EX Mode"} -- TODO: localize "EX Mode"
@@ -250,6 +257,27 @@ function main_select_speed_99(next_func, ...)
     gprint(arrow, unpack(main_menu_screen_pos))
     gprint(to_print, unpack(main_menu_screen_pos))
     gprint(to_print2, unpack(main_menu_screen_pos))
+
+    -- Draw the current score and record
+    local record = 0
+    local lastScore = 0
+    if GAME.match.mode == "time" then
+      lastScore = GAME.scores:lastTimeAttack1PForLevel(difficulty)
+      record = GAME.scores:recordTimeAttack1PForLevel(difficulty)
+    elseif GAME.match.mode == "endless" then
+      lastScore = GAME.scores:lastEndlessForLevel(difficulty)
+      record = GAME.scores:recordEndlessForLevel(difficulty)
+    end
+    local xPosition1 = 520
+    local xPosition2 = xPosition1 + 150
+    local yPosition = 220
+    local atlasHeight = themes[config.theme].images.IMG_number_atlas_1P:getHeight()
+    draw_pixel_font("last score", themes[config.theme].images.IMG_pixelFont_atlas, standard_pixel_font_map(), xPosition1, yPosition, 0.5, 1.0)
+    draw_number(lastScore, themes[config.theme].images.IMG_number_atlas_1P, 10, {}, xPosition1, yPosition + atlasHeight + 4, 1)
+    draw_pixel_font("record", themes[config.theme].images.IMG_pixelFont_atlas, standard_pixel_font_map(), xPosition2, yPosition, 0.5, 1.0)
+    draw_number(record, themes[config.theme].images.IMG_number_atlas_1P, 10, {}, xPosition2, yPosition + atlasHeight + 4, 1)
+
+    
     wait()
     variable_step(
       function()
@@ -262,12 +290,14 @@ function main_select_speed_99(next_func, ...)
             speed = bound(1, speed + 1, 99)
           elseif active_idx == 2 then -- increase difficulty by 1
             difficulty = bound(1, difficulty + 1, 4)
+            speed = level_to_starting_speed[difficulty]
           end
         elseif menu_left(k) then
           if active_idx == 1 then -- decrease speed by 1
             speed = bound(1, speed - 1, 99)
           elseif active_idx == 2 then -- decrease difficulty by 1
             difficulty = bound(1, difficulty - 1, 4)
+            speed = level_to_starting_speed[difficulty]
           end
         elseif menu_enter(k) then -- selection is "Go!", execute next function with settings
           if active_idx == 3 then
@@ -372,7 +402,7 @@ function main_endless(...)
   replay.in_buf = ""
   replay.gpan_buf = ""
   replay.mode = "endless"
-  P1 = Stack(1, "endless", config.panels, ...)
+  P1 = Stack(1, GAME.match, config.panels, ...)
   P1.is_local = true
   P1:wait_for_random_character()
   P1.do_countdown = config.ready_countdown_1P or false
@@ -402,6 +432,7 @@ function main_endless(...)
       write_replay_file()
       write_replay_file(path, filename)
 
+      GAME.scores:saveEndlessScoreForLevel(P1.score, P1.difficulty)
       return game_over_transition, {main_select_mode, nil, P1:pick_win_sfx()}
     end
     variable_step(
@@ -422,7 +453,7 @@ end
 function main_time_attack(...)
   pick_random_stage()
   pick_use_music_from()
-  P1 = Stack(1, "time", config.panels, ...)
+  P1 = Stack(1, GAME.match, config.panels, ...)
   P1.is_local = true
   P1:wait_for_random_character()
   P1.enable_analytics = true
@@ -437,6 +468,7 @@ function main_time_attack(...)
     end
     wait()
     if P1:game_ended() then
+      GAME.scores:saveTimeAttack1PScoreForLevel(P1.score, P1.difficulty)
       return game_over_transition, {main_select_mode, nil, P1:pick_win_sfx()}
     end
     variable_step(
@@ -1051,11 +1083,7 @@ function main_local_vs_yourself()
       end
     )
     if P1:game_ended() then
-      player1Scores.vsSelf["last"][P1.level] = P1.score
-      if player1Scores.vsSelf["record"][P1.level] < P1.score then
-        player1Scores.vsSelf["record"][P1.level] = P1.score
-      end
-      write_score_file()
+      GAME.scores:saveVsSelfScoreForLevel(P1.score, P1.level)
 
       return game_over_transition, {select_screen.main, nil, P1:pick_win_sfx()}
     end
@@ -1083,9 +1111,10 @@ function main_replay_vs()
   pick_random_stage()
   pick_use_music_from()
   select_screen.fallback_when_missing = {nil, nil}
-  P1 = Stack(1, "vs", config.panels, replay.P1_level or 5)
+  GAME.match = Match("vs")
+  P1 = Stack(1, GAME.match, config.panels, replay.P1_level or 5)
   P1.is_local = false
-  P2 = Stack(2, "vs", config.panels, replay.P2_level or 5)
+  P2 = Stack(2, GAME.match, config.panels, replay.P2_level or 5)
   P2.is_local = false
   P1.do_countdown = replay.do_countdown or false
   P2.do_countdown = replay.do_countdown or false
@@ -1196,7 +1225,8 @@ function main_replay_endless()
   stop_the_music()
   pick_random_stage()
   pick_use_music_from()
-  P1 = Stack(1, "endless", config.panels, replay.speed, replay.difficulty)
+  GAME.match = Match("endless")
+  P1 = Stack(1, GAME.match, config.panels, replay.speed, replay.difficulty)
   P1.is_local = false
   P1:wait_for_random_character()
   P1.do_countdown = replay.do_countdown or false
@@ -1253,7 +1283,9 @@ function main_replay_puzzle()
   stop_the_music()
   pick_random_stage()
   pick_use_music_from()
-  P1 = Stack(1, "puzzle", config.panels)
+
+  GAME.match = Match("puzzle")
+  P1 = Stack(1, GAME.match, config.panels)
   P1.is_local = false
   P1:wait_for_random_character()
   P1.do_countdown = replay.do_countdown or false
@@ -1313,7 +1345,8 @@ function make_main_puzzle(puzzles)
     -- instantiate a puzzle replay
     replay.puzzle = {}
     local replay = replay.puzzle
-    P1 = Stack(1, "puzzle", config.panels)
+    GAME.match = Match("puzzle")
+    P1 = Stack(1, GAME.match, config.panels)
     P1.is_local = true
     P1:wait_for_random_character()
     P1.do_countdown = config.ready_countdown_1P or false
@@ -1862,6 +1895,9 @@ function game_over_transition(next_func, text, winnerSFX, timemax)
       end
     )
     if ret then
+      GAME.match = nil
+      P1 = nil
+      P2 = nil
       return unpack(ret)
     end
   end

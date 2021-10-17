@@ -19,6 +19,9 @@ require("sound")
 require("timezones")
 require("gen_panels")
 
+GAME = require("game")
+GAME.scores = require("scores")
+
 global_canvas = love.graphics.newCanvas(canvas_width, canvas_height)
 
 local last_x = 0

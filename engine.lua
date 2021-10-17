@@ -17,7 +17,9 @@ local current_music_is_casual = false -- must be false so that casual music star
 -- Represents the full panel stack for one player
 Stack =
   class(
-  function(s, which, mode, panels_dir, speed, difficulty, player_number)
+  function(s, which, match, panels_dir, speed, difficulty, player_number)
+
+    s.match = match
     s.character = config.character
     s.max_health = 1
     s.panels_dir = panels_dir or config.panels
@@ -25,14 +27,15 @@ Stack =
     if not panels[panels_dir] then
       s.panels_dir = config.panels
     end
-    s.mode = mode or "endless"
-    if mode ~= "puzzle" then
+    
+    print(s.match)
+    if s.match.mode ~= "puzzle" then
       s.do_first_row = true
     end
-    if s.mode == "endless" then
+
+    if s.match.mode == "endless" then
       s.NCOLORS = difficulty_to_ncolors_endless[difficulty]
-    end
-    if s.mode == "time" then
+    elseif s.match.mode == "time" then
       s.NCOLORS = difficulty_to_ncolors_1Ptime[difficulty]
     end
 
@@ -40,9 +43,9 @@ Stack =
     s.canvas = love.graphics.newCanvas(104 * GFX_SCALE, 204 * GFX_SCALE)
     s.canvas:setFilter("nearest", "nearest")
 
-    if s.mode == "2ptime" or s.mode == "vs" then
+    if s.match.mode == "2ptime" or s.match.mode == "vs" then
       local level = speed or 5
-      s.character = (type(difficulty) == "string") and difficulty or s.character
+      s.character = (type(difficulty) == "string") and difficulty or s.character -- we used the difficulty variable for the character....
       s.level = level
       speed = level_to_starting_speed[level]
       --difficulty           = level_to_difficulty[level]
@@ -57,7 +60,7 @@ Stack =
       s.combo_coefficient = level_to_combo_coefficient[s.level]
       s.chain_constant = level_to_chain_constant[s.level]
       s.chain_coefficient = level_to_chain_coefficient[s.level]
-      if s.mode == "2ptime" then
+      if s.match.mode == "2ptime" then
         s.NCOLORS = level_to_ncolors_time[level]
       else
         s.NCOLORS = level_to_ncolors_vs[level]
@@ -170,7 +173,7 @@ Stack =
     s.cur_dir = nil -- the direction pressed
     s.cur_row = 7 -- the row the cursor's on
     s.cur_col = 3 -- the column the left half of the cursor's on
-    s.top_cur_row = s.height + (s.mode == "puzzle" and 0 or -1)
+    s.top_cur_row = s.height + (s.match.mode == "puzzle" and 0 or -1)
 
     s.move_sound = false -- this is set if the cursor movement sound should be played
     s.poppedPanelIndex = s.poppedPanelIndex or 1
@@ -937,7 +940,7 @@ function Stack.PdP(self)
 
     -- Phase 0 //////////////////////////////////////////////////////////////
     -- Stack automatic rising
-    if self.speed ~= 0 and not self.manual_raise and self.stop_time == 0 and not self.rise_lock and self.mode ~= "puzzle" then
+    if self.speed ~= 0 and not self.manual_raise and self.stop_time == 0 and not self.rise_lock and self.match.mode ~= "puzzle" then
       if self.panels_in_top_row then
         self.health = self.health - 1
         if self.health < 1 and self.shake_time < 1 then
@@ -1182,7 +1185,7 @@ function Stack.PdP(self)
               -- it should be removed immediately!
               if panel.combo_size == panel.combo_index then
                 self.panels_cleared = self.panels_cleared + 1
-                if self.mode == "vs" and self.panels_cleared % level_to_metal_panel_frequency[self.level] == 0 then
+                if self.match.mode == "vs" and self.panels_cleared % level_to_metal_panel_frequency[self.level] == 0 then
                   self.metal_panels_queued = min(self.metal_panels_queued + 1, level_to_metal_panel_cap[self.level])
                 end
                 SFX_Pop_Play = 1
@@ -1197,7 +1200,7 @@ function Stack.PdP(self)
                 panel.state = "popped"
                 panel.timer = (panel.combo_size - panel.combo_index) * self.FRAMECOUNT_POP
                 self.panels_cleared = self.panels_cleared + 1
-                if self.mode == "vs" and self.panels_cleared % level_to_metal_panel_frequency[self.level] == 0 then
+                if self.match.mode == "vs" and self.panels_cleared % level_to_metal_panel_frequency[self.level] == 0 then
                   self.metal_panels_queued = min(self.metal_panels_queued + 1, level_to_metal_panel_cap[self.level])
                 end
                 SFX_Pop_Play = 1
@@ -1322,7 +1325,7 @@ function Stack.PdP(self)
     end
 
     -- MANUAL STACK RAISING
-    if self.manual_raise and self.mode ~= "puzzle" then
+    if self.manual_raise and self.match.mode ~= "puzzle" then
       if not self.rise_lock then
         if self.panels_in_top_row then
           self:set_game_over()
@@ -1484,7 +1487,7 @@ function Stack.PdP(self)
         SFX_Swap_Play = 0
       end
       if SFX_Cur_Move_Play == 1 then
-        if not (self.mode == "vs" and themes[config.theme].sounds.swap:isPlaying()) and not self.do_countdown then
+        if not (self.match.mode == "vs" and themes[config.theme].sounds.swap:isPlaying()) and not self.do_countdown then
           themes[config.theme].sounds.cur_move:stop()
           themes[config.theme].sounds.cur_move:play()
         end
@@ -1598,7 +1601,7 @@ function Stack.game_ended(self)
     result = true
   end
 
-  if self.mode == "time" then
+  if self.match.mode == "time" then
     if self.game_stopwatch then
       if self.game_stopwatch > time_attack_time * 60 then
         result = true
