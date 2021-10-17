@@ -164,83 +164,6 @@ local function output_pretty_analytics()
   )
 end
 
-function AnalyticsInstance.draw(self, x, y)
-
-  local backgroundPadding = 6
-  local textYPadding = 18
-
-  grectangle_color("fill", x / GFX_SCALE - backgroundPadding, y / GFX_SCALE - backgroundPadding, 160/GFX_SCALE, 490/GFX_SCALE, 0, 0, 0, 0.6)
-
-  gprint("Panels destroyed: " .. self.data.destroyed_panels, x, y)
-  y = y + textYPadding
-
-  gprint("Sent garbage lines: " .. self.data.sent_garbage_lines, x, y)
-  y = y + textYPadding
-
-  gprint("Moved " .. self.data.move_count .. " times", x, y)
-  y = y + textYPadding
-
-  gprint("Swapped " .. self.data.swap_count .. " times", x, y)
-  y = y + textYPadding
-
-  y = y + textYPadding
-
-  local yCombo = y
-
-  -- Clean up the chain data so we only show chains up to the highest chain the user has done
-  local chainData = shallowcpy(self.data.reached_chains)
-  local chain_above_13 = compute_above_13(self.data)
-
-  for i = 2, 13, 1 do
-    if not chainData[i] then
-      chainData[i] = 0
-    end
-  end
-  table.insert(chainData, chain_above_13)
-  for i = #chainData, 0, -1 do
-    if chainData[i] and chainData[i] == 0 then
-      chainData[i] = nil
-    else
-      break
-    end
-  end
-
-  -- Draw the chain images
-  for i = 2, #chainData do
-    local chain_amount = chainData[i] or 0
-    draw(themes[config.theme].images.IMG_cards[true][i], x / GFX_SCALE, y / GFX_SCALE, 0, 0.5, 0.5)
-    gprintf(chain_amount, x + 30, y + 0, canvas_width, "left", nil, 1, 8)
-
-    y = y + 30
-  end
-
-  -- Clean up the combo data so we only show combos up to the highest combo the user has done
-  local comboData = shallowcpy(self.data.used_combos)
-
-  for i = 4, 15, 1 do
-    if not comboData[i] then
-      comboData[i] = 0
-    end
-  end
-  for i = #comboData, 0, -1 do
-    if comboData[i] and comboData[i] == 0 then
-      comboData[i] = nil
-    else
-      break
-    end
-  end
-
-  -- Draw the combo images
-  local xCombo = x + 50
-  for i = 4, #comboData do
-    local combo_amount = comboData[i] or 0
-    draw(themes[config.theme].images.IMG_cards[false][i], xCombo / GFX_SCALE, yCombo / GFX_SCALE, 0, 0.5, 0.5)
-    gprintf(combo_amount, xCombo + 30, yCombo + 0, canvas_width, "left", nil, 1, 8)
-
-    yCombo = yCombo + 30
-  end
-end
-
 local function write_analytics_files()
   pcall(
     function()
@@ -256,6 +179,10 @@ local function write_analytics_files()
       output_pretty_analytics()
     end
   )
+end
+
+function AnalyticsInstance.compute_above_13(self)
+  return compute_above_13(self.data)
 end
 
 function AnalyticsInstance.data_update_list(self)
