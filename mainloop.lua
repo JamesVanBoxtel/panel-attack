@@ -402,11 +402,9 @@ function main_endless(...)
   replay.in_buf = ""
   replay.gpan_buf = ""
   replay.mode = "endless"
-  P1 = Stack(1, GAME.match, config.panels, ...)
-  P1.is_local = true
+  P1 = Stack(1, GAME.match, true, config.panels, ...)
   P1:wait_for_random_character()
   P1.do_countdown = config.ready_countdown_1P or false
-  P1.enable_analytics = true
   P2 = nil
   replay.do_countdown = P1.do_countdown or false
   replay.speed = P1.speed
@@ -453,10 +451,8 @@ end
 function main_time_attack(...)
   pick_random_stage()
   pick_use_music_from()
-  P1 = Stack(1, GAME.match, config.panels, ...)
-  P1.is_local = true
+  P1 = Stack(1, GAME.match, true, config.panels, ...)
   P1:wait_for_random_character()
-  P1.enable_analytics = true
   make_local_panels(P1, "000000")
   P1:starting_state()
   P2 = nil
@@ -1112,10 +1108,8 @@ function main_replay_vs()
   pick_use_music_from()
   select_screen.fallback_when_missing = {nil, nil}
   GAME.match = Match("vs")
-  P1 = Stack(1, GAME.match, config.panels, replay.P1_level or 5)
-  P1.is_local = false
-  P2 = Stack(2, GAME.match, config.panels, replay.P2_level or 5)
-  P2.is_local = false
+  P1 = Stack(1, GAME.match, false, config.panels, replay.P1_level or 5)
+  P2 = Stack(2, GAME.match, false, config.panels, replay.P2_level or 5)
   P1.do_countdown = replay.do_countdown or false
   P2.do_countdown = replay.do_countdown or false
   P1.ice = true
@@ -1226,8 +1220,7 @@ function main_replay_endless()
   pick_random_stage()
   pick_use_music_from()
   GAME.match = Match("endless")
-  P1 = Stack(1, GAME.match, config.panels, replay.speed, replay.difficulty)
-  P1.is_local = false
+  P1 = Stack(1, GAME.match, false, config.panels, replay.speed, replay.difficulty)
   P1:wait_for_random_character()
   P1.do_countdown = replay.do_countdown or false
   P1.max_runs_per_frame = 1
@@ -1285,8 +1278,7 @@ function main_replay_puzzle()
   pick_use_music_from()
 
   GAME.match = Match("puzzle")
-  P1 = Stack(1, GAME.match, config.panels)
-  P1.is_local = false
+  P1 = Stack(1, GAME.match, false, config.panels)
   P1:wait_for_random_character()
   P1.do_countdown = replay.do_countdown or false
   P1.max_runs_per_frame = 1
@@ -1346,8 +1338,7 @@ function make_main_puzzle(puzzles)
     replay.puzzle = {}
     local replay = replay.puzzle
     GAME.match = Match("puzzle")
-    P1 = Stack(1, GAME.match, config.panels)
-    P1.is_local = true
+    P1 = Stack(1, GAME.match, true, config.panels)
     P1:wait_for_random_character()
     P1.do_countdown = config.ready_countdown_1P or false
     P2 = nil
@@ -1883,12 +1874,13 @@ function game_over_transition(next_func, text, winnerSFX, timemax)
             end
           end
         end
+
         -- if conditions are met, leave the game over screen
         if t >= timemin and ((t >= timemax and timemax >= 0) or (menu_enter(k) or menu_escape(k))) or new_match_started then
           set_music_fade_percentage(1) -- reset the music back to normal config volume
           stop_all_audio()
           SFX_GameOver_Play = 0
-          analytics.game_ends()
+          analytics.game_ends(P1.analytic)
           ret = {next_func}
         end
         t = t + 1

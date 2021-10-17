@@ -1,4 +1,4 @@
-local analytics = require("analytics")
+require("analytics")
 
 -- Stuff defined in this file:
 --  . the data structures that store the configuration of
@@ -17,13 +17,14 @@ local current_music_is_casual = false -- must be false so that casual music star
 -- Represents the full panel stack for one player
 Stack =
   class(
-  function(s, which, match, panels_dir, speed, difficulty, player_number)
+  function(s, which, match, is_local, panels_dir, speed, difficulty, player_number)
 
     s.match = match
     s.character = config.character
     s.max_health = 1
     s.panels_dir = panels_dir or config.panels
     s.portraitFade = 0
+    s.is_local = is_local
     if not panels[panels_dir] then
       s.panels_dir = config.panels
     end
@@ -199,7 +200,7 @@ Stack =
 
     s.prev_states = {}
 
-    s.enable_analytics = false
+    s.analytic = AnalyticsInstance(s.is_local)
   end
 )
 
@@ -1263,9 +1264,7 @@ function Stack.PdP(self)
       self.cur_col = bound(1, self.cur_col + d_col[self.cur_dir], width - 1)
       if (self.move_sound and (self.cur_timer == 0 or self.cur_timer == self.cur_wait_time) and (self.cur_row ~= prev_row or self.cur_col ~= prev_col)) then
         SFX_Cur_Move_Play = 1
-        if self.enable_analytics then
-          analytics.register_move()
-        end
+        self.analytic:register_move()
       end
     else
       self.cur_row = bound(1, self.cur_row, self.top_cur_row)
@@ -1316,9 +1315,7 @@ function Stack.PdP(self)
 
       if do_swap then
         self.do_swap = true
-        if self.enable_analytics then
-          analytics.register_swap()
-        end
+        self.analytic:register_swap()
       end
       self.swap_1 = false
       self.swap_2 = false
@@ -1353,9 +1350,7 @@ function Stack.PdP(self)
     if self.chain_counter ~= 0 and self.n_chain_panels == 0 then
       self:set_chain_garbage(self.chain_counter)
       SFX_Fanfare_Play = self.chain_counter
-      if self.enable_analytics then
-        analytics.register_chain(self.chain_counter)
-      end
+      self.analytic:register_chain(self.chain_counter)
       self.chain_counter = 0
     end
 
@@ -2071,9 +2066,7 @@ function Stack.check_matches(self)
   end
 
   if (combo_size ~= 0) then
-    if self.enable_analytics then
-      analytics.register_destroyed_panels(combo_size)
-    end
+    self.analytic:register_destroyed_panels(combo_size)
     if (combo_size > 3) then
       if (score_mode == SCOREMODE_TA) then
         if (combo_size > 30) then

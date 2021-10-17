@@ -1,6 +1,5 @@
 require("input")
 require("util")
-local analytics = require("analytics")
 
 local floor = math.floor
 local ceil = math.ceil
@@ -721,8 +720,12 @@ function Stack.render(self)
   end
 
   -- Draw the analytics data
-  if self.enable_analytics then
-    analytics.draw(self.score_x - 500, self.score_y)
+  if config.enable_analytics then
+    local xPosition = self.score_x - 512
+    if self == P2 then
+      xPosition = xPosition + 990
+    end
+    self.analytic:draw(xPosition, self.score_y)
   end
   -- ends here
 end
