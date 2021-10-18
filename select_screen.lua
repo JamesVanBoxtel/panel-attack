@@ -908,7 +908,7 @@ function select_screen.main()
           GAME.match = Match("vs")
           local is_local = true
           if currently_spectating then
-            P1.is_local = false
+            is_local = false
           end
           P1 = Stack(1, GAME.match, is_local, msg.player_settings.panels_dir, msg.player_settings.level, msg.player_settings.character, msg.player_settings.player_number)
           P1.cur_wait_time = default_input_repeat_delay -- this enforces default cur_wait_time for online games.  It is yet to be decided if we want to allow this to be custom online.

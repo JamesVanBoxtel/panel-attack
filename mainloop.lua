@@ -144,9 +144,6 @@ do
       --{loc("mm_2_vs_online", "LittleEndu's server"), main_net_vs_setup, {"51.15.207.223"}},
       {loc("mm_2_vs_online", "server for ranked Ex Mode"), main_net_vs_setup, {"exserver.panelattack.com", 49568}},
       {loc("mm_2_vs_local"), main_local_vs_setup},
-      --{loc("mm_replay_of", loc("mm_1_endless")), main_replay_endless},
-      --{loc("mm_replay_of", loc("mm_1_puzzle")), main_replay_puzzle},
-      --{loc("mm_replay_of", loc("mm_2_vs")), main_replay_vs},
       {loc("mm_replay_browser"), replay_browser.main},
       {loc("mm_configure"), main_config_input},
       {loc("mm_set_name"), main_set_name},
@@ -227,6 +224,9 @@ function main_timeattack_setup()
 end
 
 function main_select_speed_99(next_func, ...)
+
+  background = themes[config.theme].images.bg_main
+  
   local difficulties = {"Easy", "Normal", "Hard", "EX Mode"}
   local loc_difficulties = {loc("easy"), loc("normal"), loc("hard"), "EX Mode"} -- TODO: localize "EX Mode"
 
@@ -431,7 +431,7 @@ function main_endless(...)
       write_replay_file(path, filename)
 
       GAME.scores:saveEndlessScoreForLevel(P1.score, P1.difficulty)
-      return game_over_transition, {main_select_mode, nil, P1:pick_win_sfx()}
+      return game_over_transition, {main_endless_setup, nil, P1:pick_win_sfx()}
     end
     variable_step(
       function()
@@ -465,7 +465,7 @@ function main_time_attack(...)
     wait()
     if P1:game_ended() then
       GAME.scores:saveTimeAttack1PScoreForLevel(P1.score, P1.difficulty)
-      return game_over_transition, {main_select_mode, nil, P1:pick_win_sfx()}
+      return game_over_transition, {main_timeattack_setup, nil, P1:pick_win_sfx()}
     end
     variable_step(
       function()
@@ -1101,7 +1101,7 @@ end
 function main_replay_vs()
   local replay = replay.vs
   if replay == nil then
-    return main_dumb_transition, {main_select_mode, loc("rp_no_replay"), 0, -1}
+    return main_dumb_transition, {replay_browser.main, loc("rp_no_replay"), 0, -1}
   end
   stop_the_music()
   pick_random_stage()
@@ -1214,7 +1214,7 @@ end
 function main_replay_endless()
   local replay = replay.endless
   if replay == nil or replay.speed == nil then
-    return main_dumb_transition, {main_select_mode, loc("rp_no_endless"), 0, -1}
+    return main_dumb_transition, {replay_browser.main, loc("rp_no_endless"), 0, -1}
   end
   stop_the_music()
   pick_random_stage()
@@ -1243,7 +1243,7 @@ function main_replay_endless()
     variable_step(
       function()
         if menu_escape(K[1]) then
-          ret = {main_dumb_transition, {main_select_mode, "", 0, 0}}
+          ret = {main_dumb_transition, {replay_browser.main, "", 0, 0}}
         end
         if menu_enter(K[1]) then
           run = not run
@@ -1271,7 +1271,7 @@ end
 function main_replay_puzzle()
   local replay = replay.puzzle
   if not replay or replay.in_buf == nil or replay.in_buf == "" then
-    return main_dumb_transition, {main_select_mode, loc("rp_no_puzzle"), 0, -1}
+    return main_dumb_transition, {replay_browser.main, loc("rp_no_puzzle"), 0, -1}
   end
   stop_the_music()
   pick_random_stage()
@@ -1299,7 +1299,7 @@ function main_replay_puzzle()
     variable_step(
       function()
         if menu_escape(K[1]) then
-          ret = {main_dumb_transition, {main_select_mode, "", 0, 0}}
+          ret = {main_dumb_transition, {replay_browser.main, "", 0, 0}}
         end
         if menu_enter(K[1]) then
           run = not run
