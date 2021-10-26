@@ -802,16 +802,13 @@ function build_viewable_leaderboard_string(report, first_viewable_idx, last_view
   str = loc("lb_header_board") .. "\n"
   first_viewable_idx = math.max(first_viewable_idx, 1)
   last_viewable_idx = math.min(last_viewable_idx, #report)
-
   for i = first_viewable_idx, last_viewable_idx do
-    rating_spacing = "     " .. string.rep("  ", (3 - string.len(i)))
-    name_spacing = "     " .. string.rep("  ", (4 - string.len(report[i].rating)))
     if report[i].is_you then
       str = str .. loc("lb_you") .. "-> "
     else
       str = str .. "      "
     end
-    str = str .. i .. rating_spacing .. report[i].rating .. name_spacing .. report[i].user_name
+    str = str .. i .. "    " .. report[i].rating .. "    " .. report[i].user_name
     if i < #report then
       str = str .. "\n"
     end
@@ -1181,6 +1178,7 @@ function main_replay_vs()
   P2:starting_state()
   local end_text = nil
   local run = true
+  local advanceFrameFlag
   while true do
     debug_mouse_panel = nil
     gprint(my_name or "", P1.score_x, P1.score_y - 28)
@@ -1201,6 +1199,16 @@ function main_replay_vs()
         if menu_enter(K[1]) then
           run = not run
         end
+        if keys["right"] and run then
+          P1.max_runs_per_frame = 2
+          P2.max_runs_per_frame = 2
+        elseif this_frame_keys["right"] and not run then
+          advanceFrameFlag = true
+          run = true
+        else
+          P1.max_runs_per_frame = 1
+          P2.max_runs_per_frame = 1
+        end
         if this_frame_keys["\\"] then
           run = false
         end
@@ -1208,6 +1216,10 @@ function main_replay_vs()
           P1:run()
           P1:handle_pause()
           P2:run()
+        end
+        if advanceFrameFlag then
+          advanceFrameFlag = false
+          run = false
         end
       end
     )
@@ -1248,6 +1260,7 @@ end
 
 -- replay endless game
 function main_replay_endless()
+  local k = K[1]
   local replay = replay.endless
   if replay == nil or replay.speed == nil then
     return main_dumb_transition, {replay_browser.main, loc("rp_no_endless"), 0, -1}
@@ -1269,8 +1282,10 @@ function main_replay_endless()
   P1:starting_state()
   P2 = nil
   local run = true
+  local advanceFrameFlag = false
   while true do
     P1:render()
+    print(json.encode(keys))
     if game_is_paused then
       draw_pause()
     end
@@ -1284,6 +1299,14 @@ function main_replay_endless()
         if menu_enter(K[1]) then
           run = not run
         end
+        if keys["right"] and run then
+          P1.max_runs_per_frame = 2
+        elseif this_frame_keys["right"] and not run then
+          advanceFrameFlag = true
+          run = true
+        else
+          P1.max_runs_per_frame = 1
+        end
         if this_frame_keys["\\"] then
           run = false
         end
@@ -1294,6 +1317,10 @@ function main_replay_endless()
           end
           P1:run()
           P1:handle_pause()
+          if advanceFrameFlag then
+            advanceFrameFlag = false
+            run = false
+          end
         end
       end
     )
@@ -1323,6 +1350,7 @@ function main_replay_puzzle()
   P1:set_puzzle_state(unpack(replay.puzzle))
   P2 = nil
   local run = true
+  local advanceFrameFlag = false
   while true do
     debug_mouse_panel = nil
     P1:render()
@@ -1340,6 +1368,14 @@ function main_replay_puzzle()
         if menu_enter(K[1]) then
           run = not run
         end
+        if keys["right"] and run then
+          P1.max_runs_per_frame = 2
+        elseif this_frame_keys["right"] and not run then
+          advanceFrameFlag = true
+          run = true
+        else
+          P1.max_runs_per_frame = 1
+        end
         if this_frame_keys["\\"] then
           run = false
         end
@@ -1353,6 +1389,10 @@ function main_replay_puzzle()
           end
           P1:run()
           P1:handle_pause()
+          if advanceFrameFlag then
+            advanceFrameFlag = false
+            run = false
+          end
         end
       end
     )
@@ -1744,7 +1784,7 @@ end
 -- show game over screen, last frame of gameplay
 function game_over_transition(next_func, text, winnerSFX, timemax)
   game_is_paused = false
-
+  
   timemax = timemax or -1 -- negative values means the user needs to press enter/escape to continue
   text = text or ""
   button_text = loc("continue_button")
