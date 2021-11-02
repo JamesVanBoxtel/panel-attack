@@ -3,11 +3,12 @@ require("queue")
 require("server_queue")
 require("sound_util")
 
--- keyboard assignment vars
+-- K is a mapping of keys to inputs for a given player
 K = {{up="up", down="down", left="left", right="right",
       swap1="z", swap2="x", taunt_up="y", taunt_down="u", raise1="c", raise2="v", pause="p"},
       {},{},{}}
 keys = {}
+keyReleased = {}
 this_frame_keys = {}
 this_frame_released_keys = {}
 this_frame_unicodes = {}

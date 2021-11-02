@@ -314,9 +314,28 @@ function Stack.handle_input_taunt(self)
   end
 end
 
+local function processKeyReleased(keys, valueToAdd) 
+  for _, key in pairs(keys) do
+    if keyReleased[key] ~= nil and #keyReleased[key] > 0 then
+      table.remove(keyReleased[key])
+      return valueToAdd
+    end
+  end
+  return 0
+end
+
 function Stack.send_controls(self)
   local k = K[self.which]
-  local to_send = base64encode[((keys[k.raise1] or keys[k.raise2] or this_frame_keys[k.raise1] or this_frame_keys[k.raise2]) and 32 or 0) + ((this_frame_keys[k.swap1] or this_frame_keys[k.swap2]) and 16 or 0) + ((keys[k.up] or this_frame_keys[k.up]) and 8 or 0) + ((keys[k.down] or this_frame_keys[k.down]) and 4 or 0) + ((keys[k.left] or this_frame_keys[k.left]) and 2 or 0) + ((keys[k.right] or this_frame_keys[k.right]) and 1 or 0) + 1]
+
+  local result = processKeyReleased({k.raise1, k.raise2}, 32) +
+                 processKeyReleased({k.swap1, k.swap2}, 16) +
+                 processKeyReleased({k.up}, 8) +
+                 processKeyReleased({k.down}, 4) +
+                 processKeyReleased({k.left}, 2) +
+                 processKeyReleased({k.right}, 1) + 
+                 1
+                 
+  local to_send = base64encode[result]
 
   if TCP_sock then
     net_send("I" .. to_send)

@@ -95,6 +95,11 @@ function love.keypressed(key, scancode, rep)
   end
   if not rep then
     keys[key] = 0
+    if keyReleased[key] == nil then
+      keyReleased[key] = {true}
+    else 
+      table.insert(keyReleased[key], true)
+    end
   end
   this_frame_keys[key] = true
 end
