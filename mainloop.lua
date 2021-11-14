@@ -107,7 +107,14 @@ function variable_step(f)
       this_frame_keys = {}
       this_frame_released_keys = {}
       this_frame_unicodes = {}
+
       leftover_time = leftover_time - 1 / 60
+      if leftover_time >= 1 / 60 then
+        GAME.droppedFrames = GAME.droppedFrames + 1
+        if GAME.match then
+          print("Dropped Frame, total is: " .. GAME.droppedFrames)
+        end
+      end
     end
   end
 end
@@ -154,7 +161,7 @@ do
       {loc("mm_1_time"), main_timeattack_setup},
       {loc("mm_1_vs"), main_local_vs_yourself_setup},
       --{loc("mm_2_vs_online", "burke.ro"), main_net_vs_setup, {"burke.ro"}},
-      {loc("mm_2_vs_online", "Jon's server"), main_net_vs_setup, {"18.188.43.50"}},
+      {loc("mm_2_vs_online", ""), main_net_vs_setup, {"18.188.43.50"}},
       --{loc("mm_2_vs_online", "betaserver.panelattack.com"), main_net_vs_setup, {"betaserver.panelattack.com"}},
       --{loc("mm_2_vs_online", "(USE ONLY WITH OTHER CLIENTS ON THIS TEST BUILD 025beta)"), main_net_vs_setup, {"18.188.43.50"}},
       --{loc("mm_2_vs_online", "This test build is for offline-use only"), main_select_mode},
@@ -226,7 +233,11 @@ function main_select_speed_99(next_func)
   local loc_difficulties = {loc("easy"), loc("normal"), loc("hard"), "EX Mode"} -- TODO: localize "EX Mode"
 
   background = themes[config.theme].images.bg_main
-
+  reset_filters()
+  if themes[config.theme].musics["main"] then
+    find_and_add_music(themes[config.theme].musics, "main")
+  end
+  
   local gameSettingsMenu
 
   local function goEscape()
@@ -386,6 +397,9 @@ function Stack.handle_pause(self)
 
     if game_is_paused then
       stop_the_music()
+      reset_filters()
+    else
+      use_current_stage()
     end
   end
 end
@@ -412,11 +426,7 @@ function main_endless(...)
   make_local_gpanels(P1, "000000")
   P1:starting_state()
   while true do
-    if game_is_paused then
-      draw_pause()
-    else
-      P1:render()
-    end
+    GAME.match:render()
     wait()
     local ret = nil
     if P1:game_ended() then
@@ -462,11 +472,7 @@ function main_time_attack(...)
   P1:starting_state()
   P2 = nil
   while true do
-    if game_is_paused then
-      draw_pause()
-    else
-      P1:render()
-    end
+    GAME.match:render()
     wait()
     local ret = nil
     if P1:game_ended() then
@@ -802,13 +808,16 @@ function build_viewable_leaderboard_string(report, first_viewable_idx, last_view
   str = loc("lb_header_board") .. "\n"
   first_viewable_idx = math.max(first_viewable_idx, 1)
   last_viewable_idx = math.min(last_viewable_idx, #report)
+
   for i = first_viewable_idx, last_viewable_idx do
+    rating_spacing = "     " .. string.rep("  ", (3 - string.len(i)))
+    name_spacing = "     " .. string.rep("  ", (4 - string.len(report[i].rating)))
     if report[i].is_you then
       str = str .. loc("lb_you") .. "-> "
     else
       str = str .. "      "
     end
-    str = str .. i .. "    " .. report[i].rating .. "    " .. report[i].user_name
+    str = str .. i .. rating_spacing .. report[i].rating .. name_spacing .. report[i].user_name
     if i < #report then
       str = str .. "\n"
     end
@@ -929,8 +938,7 @@ function main_net_vs()
     end
     -- don't spend time rendering when catching up to a current match in replays
     if not (P1 and P1.play_to_end) and not (P2 and P2.play_to_end) then
-      P1:render()
-      P2:render()
+      GAME.match:render()
       wait()
     end
 
@@ -1033,12 +1041,7 @@ function main_local_vs()
   pick_use_music_from()
   local end_text = nil
   while true do
-    if game_is_paused then
-      draw_pause()
-    else
-      P1:render()
-      P2:render()
-    end
+    GAME.match:render()
     wait()
     variable_step(
       function()
@@ -1090,11 +1093,7 @@ function main_local_vs_yourself()
   use_current_stage()
   pick_use_music_from()
   while true do
-    if game_is_paused then
-      draw_pause()
-    else
-      P1:render()
-    end
+    GAME.match:render()
     wait()
     local ret = nil
     variable_step(
@@ -1149,10 +1148,10 @@ function main_replay_vs()
   P1.garbage_target = P2
   P2.garbage_target = P1
   move_stack(P2, 2)
-  P1.input_buffer = replay.in_buf
+  P1.input_buffer = uncompress_input_string(replay.in_buf)
   P1.panel_buffer = replay.P
   P1.gpanel_buffer = replay.Q
-  P2.input_buffer = replay.I
+  P2.input_buffer = uncompress_input_string(replay.I)
   P2.panel_buffer = replay.O
   P2.gpanel_buffer = replay.R
   P1.max_runs_per_frame = 1
@@ -1182,12 +1181,8 @@ function main_replay_vs()
     debug_mouse_panel = nil
     gprint(my_name or "", P1.score_x, P1.score_y - 28)
     gprint(op_name or "", P2.score_x, P2.score_y - 28)
-    P1:render()
-    P2:render()
+    GAME.match:render()
     draw_debug_mouse_panel()
-    if game_is_paused then
-      draw_pause()
-    end
     wait()
     local ret = nil
     variable_step(
@@ -1257,7 +1252,7 @@ function main_replay_endless()
   P1:wait_for_random_character()
   P1.do_countdown = replay.do_countdown or false
   P1.max_runs_per_frame = 1
-  P1.input_buffer = table.concat({replay.in_buf})
+  P1.input_buffer = table.concat({uncompress_input_string(replay.in_buf)})
   P1.panel_buffer = replay.pan_buf
   P1.gpanel_buffer = replay.gpan_buf
   P1.speed = replay.speed
@@ -1267,10 +1262,7 @@ function main_replay_endless()
   P2 = nil
   local run = true
   while true do
-    P1:render()
-    if game_is_paused then
-      draw_pause()
-    end
+    GAME.match:render()
     wait()
     local ret = nil
     variable_step(
@@ -1315,18 +1307,15 @@ function main_replay_puzzle()
   P1:wait_for_random_character()
   P1.do_countdown = replay.do_countdown or false
   P1.max_runs_per_frame = 1
-  P1.input_buffer = replay.in_buf
+  P1.input_buffer = uncompress_input_string(replay.in_buf)
   P1.cur_wait_time = replay.cur_wait_time or default_input_repeat_delay
   P1:set_puzzle_state(unpack(replay.puzzle))
   P2 = nil
   local run = true
   while true do
     debug_mouse_panel = nil
-    P1:render()
+    GAME.match:render()
     draw_debug_mouse_panel()
-    if game_is_paused then
-      draw_pause()
-    end
     wait()
     local ret = nil
     variable_step(
@@ -1384,11 +1373,7 @@ function make_main_puzzle(puzzles)
     replay.puzzle = puzzles[awesome_idx]
     replay.in_buf = ""
     while true do
-      if game_is_paused then
-        draw_pause()
-      else
-        P1:render()
-      end
+      GAME.match:render()
       wait()
       local ret = nil
       variable_step(
@@ -1741,7 +1726,7 @@ end
 -- show game over screen, last frame of gameplay
 function game_over_transition(next_func, text, winnerSFX, timemax)
   game_is_paused = false
-  
+
   timemax = timemax or -1 -- negative values means the user needs to press enter/escape to continue
   text = text or ""
   button_text = loc("continue_button")
@@ -1759,12 +1744,7 @@ function game_over_transition(next_func, text, winnerSFX, timemax)
   end
 
   while true do
-    if P1 then
-      P1:render()
-    end
-    if P2 then
-      P2:render()
-    end
+    GAME.match:render()
     gprint(text, (canvas_width - font:getWidth(text)) / 2, (canvas_height - font:getHeight(text)) / 2)
     gprint(button_text, (canvas_width - font:getWidth(button_text)) / 2, ((canvas_height - font:getHeight(button_text)) / 2) + 30)
     wait()
@@ -1778,7 +1758,7 @@ function game_over_transition(next_func, text, winnerSFX, timemax)
         else
           if t == fadeMusicLength + 1 then
             set_music_fade_percentage(1) -- reset the music back to normal config volume
-            stop_all_audio()
+            stop_the_music()
           end
         end
 
@@ -1807,18 +1787,18 @@ function game_over_transition(next_func, text, winnerSFX, timemax)
           do_messages() -- recieve messages so we know if the next game is in the queue
         end
 
-        local new_match_started = false -- Whether a message has been sent that indicates a match has started
+        local left_select_menu = false -- Whether a message has been sent that indicates a match has started or the room has closed
         if this_frame_messages then
           for _, msg in ipairs(this_frame_messages) do
-            -- if a new match has started flag the match started variable
-            if msg.match_start or replay_of_match_so_far then
-              new_match_started = true
+            -- if a new match has started or the room is being closed, flag the left select menu variavle
+            if msg.match_start or replay_of_match_so_far or msg.leave_room then
+              left_select_menu = true
             end
           end
         end
 
         -- if conditions are met, leave the game over screen
-        if t >= timemin and ((t >= timemax and timemax >= 0) or (menu_enter(k) or menu_escape(k))) or new_match_started then
+        if t >= timemin and ((t >= timemax and timemax >= 0) or (menu_enter(k) or menu_escape(k))) or left_select_menu then
           set_music_fade_percentage(1) -- reset the music back to normal config volume
           stop_all_audio()
           SFX_GameOver_Play = 0
