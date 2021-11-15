@@ -84,6 +84,9 @@ function fmainloop()
   love.filesystem.createDirectory("themes")
   love.filesystem.createDirectory("stages")
 
+  -- Run all unit tests now that we have everything loaded
+  require("ServerQueueTests")
+  
   --check for game updates
   if GAME_UPDATER_CHECK_UPDATE_INGAME then
     wait_game_update = GAME_UPDATER:async_download_latest_version()
@@ -544,6 +547,9 @@ function main_net_vs_lobby()
   local updated = true -- need update when first entering
   local ret = nil
 
+  local playerRatingMap = nil
+  json_send({leaderboard_request = true}) -- Request the leaderboard so we can show ratings
+
   while true do
     if connection_up_time <= login_status_message_duration then
       gprint(login_status_message, lobby_menu_x[showing_leaderboard], lobby_menu_y - 120)
@@ -616,12 +622,13 @@ function main_net_vs_lobby()
         play_optional_sfx(themes[config.theme].sounds.notification)
       end
       if msg.leaderboard_report then
-        showing_leaderboard = true
+        playerRatingMap = {}
         if lobby_menu then
           lobby_menu:show_controls(true)
         end
         leaderboard_report = msg.leaderboard_report
         for k, v in ipairs(leaderboard_report) do
+          playerRatingMap[v.user_name] = v.rating
           if v.is_you then
             my_rank = k
           end
@@ -638,6 +645,7 @@ function main_net_vs_lobby()
     local function toggleLeaderboard()
       updated = true
       if not showing_leaderboard then
+        showing_leaderboard = true
         json_send({leaderboard_request = true})
         --lobby_menu:set_button_text(#lobby_menu.buttons - 1, loc("lb_hide_board"))
       else
@@ -691,16 +699,25 @@ function main_net_vs_lobby()
         end
       end
 
+      local function playerRatingString(playerName)
+        local rating = ""
+        if playerRatingMap and playerRatingMap[playerName] then
+          rating =  " (" .. playerRatingMap[playerName] .. ")"
+        end
+        return rating
+      end
+
       lobby_menu = Click_menu(lobby_menu_x[showing_leaderboard], lobby_menu_y, nil, love.graphics.getHeight() - lobby_menu_y - 10, 1)
       for _, v in ipairs(unpaired_players) do
         if v ~= config.name then
-          local unmatchedPlayer = v .. (sent_requests[v] and " " .. loc("lb_request") or "") .. (willing_players[v] and " " .. loc("lb_received") or "")
+          local unmatchedPlayer = v .. playerRatingString(v) .. (sent_requests[v] and " " .. loc("lb_request") or "") .. (willing_players[v] and " " .. loc("lb_received") or "")
           lobby_menu:add_button(unmatchedPlayer, requestGameFunction(v), goEscape)
         end
       end
       for _, room in ipairs(spectatable_rooms) do
         if room.name then
-          local roomName = loc("lb_spectate") .. " " .. room.name .. " (" .. room.state .. ")" --printing room names
+          local roomName = loc("lb_spectate") .. " " .. room.a .. playerRatingString(room.a) .. " vs " .. room.b .. playerRatingString(room.b) .. " (" .. room.state .. ")"
+          --local roomName = loc("lb_spectate") .. " " .. room.name .. " (" .. room.state .. ")" --printing room names
           lobby_menu:add_button(roomName, requestSpectateFunction(room), goEscape)
         end
       end
@@ -718,14 +735,17 @@ function main_net_vs_lobby()
         elseif oldLobbyMenu.active_idx == #oldLobbyMenu.buttons - 1 and #lobby_menu.buttons >= 2 then
           lobby_menu:set_active_idx(#lobby_menu.buttons - 1) --the position of the "hide leaderboard" menu item
         else
+          local desiredIndex = bound(1, oldLobbyMenu.active_idx, #lobby_menu.buttons)
+          local previousText = oldLobbyMenu.buttons[oldLobbyMenu.active_idx].stringText
           for i = 1, #lobby_menu.buttons do
             if #oldLobbyMenu.buttons >= i then
-              if lobby_menu.buttons[i].stringText == oldLobbyMenu.buttons[i].stringText then
-                lobby_menu:set_active_idx(i)
+              if lobby_menu.buttons[i].stringText == previousText then
+                desiredIndex = i
                 break
               end
             end
           end
+          lobby_menu:set_active_idx(desiredIndex)
         end
 
         oldLobbyMenu = nil
@@ -831,7 +851,7 @@ function main_net_vs_setup(ip, network_port)
   end
   P1, P1_level, P2_level, got_opponent = nil
   P2 = {panel_buffer = "", gpanel_buffer = ""}
-  server_queue = ServerQueue(SERVER_QUEUE_CAPACITY)
+  server_queue = ServerQueue()
   gprint(loc("lb_set_connect"), unpack(main_menu_screen_pos))
   wait()
   network_init(ip, network_port)
@@ -889,6 +909,18 @@ function main_net_vs()
       elseif msg.leave_room then --reset win counts and go back to lobby
         return main_dumb_transition, {main_net_vs_lobby, "", 0, 0} -- someone left the game, quit to lobby
       end
+    end
+    --draw graphics
+    gprint((my_name or ""), P1.score_x + themes[config.theme].name_Pos[1], P1.score_y + themes[config.theme].name_Pos[2])
+    gprint((op_name or ""), P2.score_x + themes[config.theme].name_Pos[1], P2.score_y + themes[config.theme].name_Pos[2])
+    draw_label(themes[config.theme].images.IMG_wins, (P1.score_x + themes[config.theme].winLabel_Pos[1]) / GFX_SCALE, (P1.score_y + themes[config.theme].winLabel_Pos[2]) / GFX_SCALE, 0, themes[config.theme].winLabel_Scale)
+    draw_number(GAME.battleRoom.playerWinCounts[P1.player_number], themes[config.theme].images.IMG_timeNumber_atlas, 12, P1_win_quads, P1.score_x + themes[config.theme].win_Pos[1], P1.score_y + themes[config.theme].win_Pos[2], themes[config.theme].win_Scale, 20 / themes[config.theme].images.timeNumberWidth * themes[config.theme].time_Scale, 26 / themes[config.theme].images.timeNumberHeight * themes[config.theme].time_Scale, "center")
+
+    draw_label(themes[config.theme].images.IMG_wins, (P2.score_x + themes[config.theme].winLabel_Pos[1]) / GFX_SCALE, (P2.score_y + themes[config.theme].winLabel_Pos[2]) / GFX_SCALE, 0, themes[config.theme].winLabel_Scale)
+    draw_number(GAME.battleRoom.playerWinCounts[P2.player_number], themes[config.theme].images.IMG_timeNumber_atlas, 12, P2_win_quads, P2.score_x + themes[config.theme].win_Pos[1], P2.score_y + themes[config.theme].win_Pos[2], themes[config.theme].win_Scale, 20 / themes[config.theme].images.timeNumberWidth * themes[config.theme].time_Scale, 26 / themes[config.theme].images.timeNumberHeight * themes[config.theme].time_Scale, "center")
+
+    if not config.debug_mode then --this is printed in the same space as the debug details
+      gprint(spectators_string, themes[config.theme].spectators_Pos[1], themes[config.theme].spectators_Pos[2])
     end
     
     -- don't spend time rendering when catching up to a current match in replays
