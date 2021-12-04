@@ -1758,7 +1758,7 @@ function Stack.PdP(self)
       self.chains[self.chains.current].size = self.chain_counter
       self.chains.last_complete = self.current
       self.chains.current = nil
-      -- if self.mode == "vs" then
+      -- if self.match.mode == "vs" then
         -- self.telegraph:sender_chain_ended()
       -- end
       if self.canvas ~= nil then
@@ -1784,7 +1784,7 @@ function Stack.PdP(self)
       end
     end
 
-    if self.mode == "vs" then
+    if self.match.mode == "vs" then
       local to_send = self.telegraph:pop_all_ready_garbage()
       if to_send and to_send[1] then
         self:really_send(to_send)
@@ -1794,7 +1794,7 @@ function Stack.PdP(self)
     self:remove_extra_rows()
     
     --double-check panels_in_top_row
-  
+
     self.panels_in_top_row = false
     -- If any dangerous panels are in the top row, garbage should not fall.
     for col_idx = 1, width do
@@ -1825,27 +1825,18 @@ function Stack.PdP(self)
     -- If any panels (dangerous or not) are in rows above the top row, garbage should not fall.
     for row_idx = top_row + 1, #self.panels do
       for col_idx = 1, width do
-        if panels[top_row][col_idx]:dangerous() then
+        if panels[row_idx][col_idx].color ~= 0 then
           self.panels_in_top_row = true
-  
         end
       end
-      -- If any panels (dangerous or not) are in rows above the top row, garbage should not fall.
-      for row_idx = top_row + 1, #self.panels do
-        for col_idx = 1, width do
-          if panels[row_idx][col_idx].color ~= 0 then
-            self.panels_in_top_row = true
-          end
-        end
-      end
-  
-      if self.garbage_q:len() > 0 then
-        local next_garbage_block_width, next_garbage_block_height, _metal, from_chain = unpack(self.garbage_q:peek())
-        local drop_it = not self.panels_in_top_row and not self:has_falling_garbage() and ((from_chain and next_garbage_block_height > 1) or (self.n_active_panels == 0 and self.prev_active_panels == 0))
-        if drop_it and self.garbage_q:len() > 0 then
-          if self:drop_garbage(unpack(self.garbage_q:peek())) then
-            self.garbage_q:pop()
-          end
+    end
+
+    if self.garbage_q:len() > 0 then
+      local next_garbage_block_width, next_garbage_block_height, _metal, from_chain = unpack(self.garbage_q:peek())
+      local drop_it = not self.panels_in_top_row and not self:has_falling_garbage() and ((from_chain and next_garbage_block_height > 1) or (self.n_active_panels == 0 and self.prev_active_panels == 0))
+      if drop_it and self.garbage_q:len() > 0 then
+        if self:drop_garbage(unpack(self.garbage_q:peek())) then
+          self.garbage_q:pop()
         end
       end
     end
@@ -2440,7 +2431,7 @@ function Stack.check_matches(self)
 
   if (combo_size ~= 0) then
     self.combos[self.CLOCK] = combo_size
-    if self.mode == "vs" and metal_count == 3 and combo_size == 3 then
+    if self.match.mode == "vs" and metal_count == 3 and combo_size == 3 then
       self.telegraph:push("combo", combo_size, metal_count,first_panel_col, first_panel_row, self.CLOCK)
     end
     self.analytic:register_destroyed_panels(combo_size)
@@ -2459,7 +2450,7 @@ function Stack.check_matches(self)
       end
 
       self:enqueue_card(false, first_panel_col, first_panel_row, combo_size)
-      if self.mode == "vs" then
+      if self.match.mode == "vs" then
         self.telegraph:push("combo", combo_size, metal_count,first_panel_col, first_panel_row, self.CLOCK)
       end
       --EnqueueConfetti(first_panel_col<<4+P1StackPosX+4,
@@ -2468,12 +2459,17 @@ function Stack.check_matches(self)
       first_panel_row = first_panel_row + 1 -- offset chain cards
     end
     if (is_chain) then
-      self:enqueue_card(true, first_panel_col, first_panel_row, self.chain_counter)
-      if self.mode == "vs" then
-        self.telegraph:push("combo", combo_size, metal_count,first_panel_col, first_panel_row, self.CLOCK)
+      if self.chain_counter == 2 then
+        self.chains.current = self.CLOCK
+        self.chains[self.CLOCK] = {start = self.CLOCK}  -- a bit redundant, but might come in handy, maybe, probably not.  The key is the same as .start.
       end
+      self.chains[self.chains.current].size = self.chain_counter
+      self:enqueue_card(true, first_panel_col, first_panel_row, self.chain_counter)
     --EnqueueConfetti(first_panel_col<<4+P1StackPosX+4,
     --          first_panel_row<<4+P1StackPosY+self.displacement-9);
+      if self.match.mode == "vs" then
+        self.telegraph:push("chain",self.chain_counter,0,first_panel_col, first_panel_row, self.CLOCK)
+      end
     end
     local chain_bonus = self.chain_counter
     if (score_mode == SCOREMODE_TA) then

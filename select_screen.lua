@@ -1354,7 +1354,6 @@ function select_screen.main()
       GAME.match = Match("vs", GAME.battleRoom)
       P1 = Stack(1, GAME.match, true, cursor_data[1].state.panels_dir, cursor_data[1].state.level, cursor_data[1].state.character)
       GAME.match.P1 = P1
-      P1.garbage_target = P1
       P1:set_garbage_target(P1)
       P1.telegraph:subscribe(P1.incoming_telegraph)
       P2 = nil
