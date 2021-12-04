@@ -408,6 +408,10 @@ function Character.graphics_uninit(self)
   end
 end
 
+local function starts_with(str, start)
+  return str:sub(1, #start) == start
+end
+
 function Character.init_sfx_variants(self, sfx_array, sfx_name, sfx_suffix_at_higher_count)
   sfx_suffix_at_higher_count = sfx_suffix_at_higher_count or ""
 
@@ -429,12 +433,41 @@ function Character.init_sfx_variants(self, sfx_array, sfx_name, sfx_suffix_at_hi
     end
   end
 
+  if not sfx_array[1] and starts_with(sfx_name,"chain") and love.audio.isEffectsSupported() then
+
+    local chainNumber = tonumber(sfx_name:sub(#"chain"+1, #sfx_name))
+    if chainNumber > 2 then 
+        
+      local sound = self.sounds.others["chain"]:clone()
+      local multiplerPitch = 0.03
+
+      sound:setPitch(1 + (chainNumber - 2) * multiplerPitch)
+
+        love.audio.setEffect('echo', {type = 'reverb'})
+        --sound:setEffect('echo')
+        -- love.audio.setEffect('distortion', {
+        --   type = 'distortion',
+        --   gain = .5,
+        --   edge = .25,
+        -- })
+        -- sound:setEffect('distortion')
+        -- love.audio.setEffect('chorus', {
+        --   type = 'chorus'
+        -- })
+        -- sound:setEffect('chorus')
+
+      sound:play()
+      sfx_array[1] = sound
+    end
+  end
+
   -- search for all variants
   local sfx_count = 1
   while sfx_array[sfx_count] do
     sfx_count = sfx_count + 1
     sound_name = sfx_name .. sfx_suffix_at_higher_count .. sfx_count
     local sound = load_sound_from_supported_extensions(self.path .. "/" .. sound_name, false)
+
     if sound then
       sfx_array[sfx_count] = sound
     end
