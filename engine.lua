@@ -925,7 +925,7 @@ function Stack.set_puzzle_state(self, pstr, n_turns, do_countdown, puzzleType)
 end
 
 function Stack.puzzle_done(self)
-  if not P1.do_countdown then
+  if not self.do_countdown then
     -- For now don't require active panels to be 0, we will still animate in game over, 
     -- and we need to win immediately to avoid the failure below in the chain case.
     --if P1.n_active_panels == 0 then
@@ -950,17 +950,17 @@ end
 
 
 function Stack.puzzle_failed(self)
-  if not P1.do_countdown then
+  if not self.do_countdown then
     if self.puzzleType == "moves" then
-      if P1.n_active_panels == 0 and P1.prev_active_panels == 0 then
-        return P1.puzzle_moves == 0
+      if self.n_active_panels == 0 and self.prev_active_panels == 0 then
+        return self.puzzle_moves == 0
       end
     elseif self.puzzleType and self.puzzleType == "chain" then
-      if P1.n_active_panels == 0 and P1.prev_active_panels == 0 and #P1.analytic.data.reached_chains == 0 and P1.analytic.data.destroyed_panels > 0 then
+      if self.n_active_panels == 0 and self.prev_active_panels == 0 and #self.analytic.data.reached_chains == 0 and self.analytic.data.destroyed_panels > 0 then
         -- We finished matching but never made a chain -> fail
         return true
       end
-      if #P1.analytic.data.reached_chains > 0 and P1.n_chain_panels == 0 then
+      if #self.analytic.data.reached_chains > 0 and self.n_chain_panels == 0 then
         -- We achieved a chain, finished chaining, but haven't won yet -> fail
         return true
       end
@@ -1783,70 +1783,72 @@ function Stack.PdP(self)
         end
       end
     end
-  end
-  if self.mode == "vs" then
-    local to_send = self.telegraph:pop_all_ready_garbage()
-    if to_send and to_send[1] then
-      self:really_send(to_send)
-    end
 
-  self:remove_extra_rows()
-  
-  --double-check panels_in_top_row
-
-  self.panels_in_top_row = false
-  -- If any dangerous panels are in the top row, garbage should not fall.
-  for col_idx = 1, width do
-    if panels[top_row][col_idx]:dangerous() then
-      self.panels_in_top_row = true
-    end
-  end
-  local garbage_fits_in_populated_top_row 
-  if self.later_garbage[self.CLOCK] then
-    self.garbage_q:push(self.later_garbage[self.CLOCK])
-    self.later_garbage[self.CLOCK] = nil
-  end
-  if self.garbage_q:len() > 0 then
-    --even if there are some panels in the top row,
-    --check if the next block in the garbage_q would fit anyway
-    --ie. 3-wide garbage might fit if there are three empty spaces where it would spawn
-    garbage_fits_in_populated_top_row = true
-    local next_garbage_block_width, next_garbage_block_height, _metal, from_chain = unpack(self.garbage_q:peek())
-    local cols = self.garbage_cols[next_garbage_block_width]
-    local spawn_col = cols[cols.idx]
-    local spawn_row = #self.panels
-    for idx=spawn_col, spawn_col+next_garbage_block_width-1 do
-      if prow[idx]:dangerous() then 
-        garbage_fits_in_populated_top_row = nil
+    if self.mode == "vs" then
+      local to_send = self.telegraph:pop_all_ready_garbage()
+      if to_send and to_send[1] then
+        self:really_send(to_send)
       end
     end
-  end
-  -- If any panels (dangerous or not) are in rows above the top row, garbage should not fall.
-  for row_idx = top_row + 1, #self.panels do
+  
+    self:remove_extra_rows()
+    
+    --double-check panels_in_top_row
+  
+    self.panels_in_top_row = false
+    -- If any dangerous panels are in the top row, garbage should not fall.
     for col_idx = 1, width do
       if panels[top_row][col_idx]:dangerous() then
         self.panels_in_top_row = true
-
+      end
+    end
+    local garbage_fits_in_populated_top_row 
+    if self.later_garbage[self.CLOCK] then
+      self.garbage_q:push(self.later_garbage[self.CLOCK])
+      self.later_garbage[self.CLOCK] = nil
+    end
+    if self.garbage_q:len() > 0 then
+      --even if there are some panels in the top row,
+      --check if the next block in the garbage_q would fit anyway
+      --ie. 3-wide garbage might fit if there are three empty spaces where it would spawn
+      garbage_fits_in_populated_top_row = true
+      local next_garbage_block_width, next_garbage_block_height, _metal, from_chain = unpack(self.garbage_q:peek())
+      local cols = self.garbage_cols[next_garbage_block_width]
+      local spawn_col = cols[cols.idx]
+      local spawn_row = #self.panels
+      for idx=spawn_col, spawn_col+next_garbage_block_width-1 do
+        if prow[idx]:dangerous() then 
+          garbage_fits_in_populated_top_row = nil
+        end
       end
     end
     -- If any panels (dangerous or not) are in rows above the top row, garbage should not fall.
     for row_idx = top_row + 1, #self.panels do
       for col_idx = 1, width do
-        if panels[row_idx][col_idx].color ~= 0 then
+        if panels[top_row][col_idx]:dangerous() then
           self.panels_in_top_row = true
+  
+        end
+      end
+      -- If any panels (dangerous or not) are in rows above the top row, garbage should not fall.
+      for row_idx = top_row + 1, #self.panels do
+        for col_idx = 1, width do
+          if panels[row_idx][col_idx].color ~= 0 then
+            self.panels_in_top_row = true
+          end
+        end
+      end
+  
+      if self.garbage_q:len() > 0 then
+        local next_garbage_block_width, next_garbage_block_height, _metal, from_chain = unpack(self.garbage_q:peek())
+        local drop_it = not self.panels_in_top_row and not self:has_falling_garbage() and ((from_chain and next_garbage_block_height > 1) or (self.n_active_panels == 0 and self.prev_active_panels == 0))
+        if drop_it and self.garbage_q:len() > 0 then
+          if self:drop_garbage(unpack(self.garbage_q:peek())) then
+            self.garbage_q:pop()
+          end
         end
       end
     end
-
-    if self.garbage_q:len() > 0 then
-      local next_garbage_block_width, next_garbage_block_height, _metal, from_chain = unpack(self.garbage_q:peek())
-      local drop_it = not self.panels_in_top_row and not self:has_falling_garbage() and ((from_chain and next_garbage_block_height > 1) or (self.n_active_panels == 0 and self.prev_active_panels == 0))
-      if drop_it and self.garbage_q:len() > 0 then
-        if self:drop_garbage(unpack(self.garbage_q:peek())) then
-          self.garbage_q:pop()
-        end
-      end
-    end 
 
     -- Update Music
     if not music_mute and not game_is_paused and not (P1 and P1.play_to_end) and not (P2 and P2.play_to_end) then
