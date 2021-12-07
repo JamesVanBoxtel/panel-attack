@@ -130,7 +130,7 @@ function select_screen.main()
     find_and_add_music(themes[config.theme].musics, "main")
   end
 
-  background = themes[config.theme].images.bg_select_screen
+  GAME.backgroundImage = themes[config.theme].images.bg_select_screen
   reset_filters()
 
   select_screen.fallback_when_missing = {nil, nil}
@@ -182,6 +182,7 @@ function select_screen.main()
       local msg = server_queue:pop_next_with("create_room", "character_select", "spectate_request_granted")
       if msg then
         global_initialize_room_msg = msg
+        GAME.battleRoom = BattleRoom()
       end
       gprint(loc("ss_init"), unpack(main_menu_screen_pos))
       wait()
@@ -190,23 +191,6 @@ function select_screen.main()
       end
       retries = retries + 1
     end
-    -- if room_number_last_spectated and retries >= retry_limit and currently_spectating then
-    -- request_spectate(room_number_last_spectated)
-    -- retries = 0
-    -- while not global_initialize_room_msg and retries < retry_limit do
-    -- for _,msg in ipairs(this_frame_messages) do
-    -- if msg.create_room or msg.character_select or msg.spectate_request_granted then
-    -- global_initialize_room_msg = msg
-    -- end
-    -- end
-    -- gprint("Lost connection.  Trying to rejoin...", unpack(main_menu_screen_pos))
-    -- wait()
-    -- if not do_messages() then
-    --   return main_dumb_transition, {main_select_mode, "Disconnected from server.\n\nReturning to main menu...", 60, 300}
-    -- end
-    -- retries = retries + 1
-    -- end
-    -- end
 
     -- If we never got the room setup message, bail
     if not global_initialize_room_msg then
@@ -253,11 +237,13 @@ function select_screen.main()
     refresh_based_on_own_mods(global_op_state)
 
     if msg.win_counts then
-      update_win_counts(msg.win_counts)
+      GAME.battleRoom:updateWinCounts(msg.win_counts)
     end
+
     if msg.replay_of_match_so_far then
       replay_of_match_so_far = msg.replay_of_match_so_far
     end
+
     if msg.ranked then
       match_type = "Ranked"
       match_type_message = ""
@@ -307,8 +293,6 @@ function select_screen.main()
   -- Leaves the 2p vs match room
   local function do_leave()
     stop_the_music()
-    my_win_count = 0
-    op_win_count = 0
     return json_send({leave_room = true})
   end
 
@@ -325,8 +309,6 @@ function select_screen.main()
       end
     end
   end
-
-  my_win_count = my_win_count or 0
 
   local cursor_data = {{position = shallowcpy(name_to_xy_per_page[current_page]["__Ready"]), can_super_select = false, selected = false}, {position = shallowcpy(name_to_xy_per_page[current_page]["__Ready"]), can_super_select = false, selected = false}}
 
@@ -856,7 +838,7 @@ function select_screen.main()
       end
       for _, msg in ipairs(messages) do
         if msg.win_counts then
-          update_win_counts(msg.win_counts)
+          GAME.battleRoom:updateWinCounts(msg.win_counts)
         end
         if msg.menu_state then
           if currently_spectating then
@@ -888,8 +870,6 @@ function select_screen.main()
           end
         end
         if msg.leave_room then
-          my_win_count = 0
-          op_win_count = 0
           return main_dumb_transition, {main_net_vs_lobby, "", 0, 0} -- opponent left the select screen
         end
         if (msg.match_start or replay_of_match_so_far) and msg.player_settings and msg.opponent_settings then
@@ -906,14 +886,16 @@ function select_screen.main()
           stage_loader_load(msg.stage)
           character_loader_wait()
           stage_loader_wait()
-          GAME.match = Match("vs")
+          GAME.match = Match("vs", GAME.battleRoom)
           local is_local = true
           if currently_spectating then
             is_local = false
           end
           P1 = Stack(1, GAME.match, is_local, msg.player_settings.panels_dir, msg.player_settings.level, msg.player_settings.character, msg.player_settings.player_number)
+          GAME.match.P1 = P1
           P1.cur_wait_time = default_input_repeat_delay -- this enforces default cur_wait_time for online games.  It is yet to be decided if we want to allow this to be custom online.
           P2 = Stack(2, GAME.match, false, msg.opponent_settings.panels_dir, msg.opponent_settings.level, msg.opponent_settings.character, msg.opponent_settings.player_number)
+          GAME.match.P2 = P2
           P2.cur_wait_time = default_input_repeat_delay -- this enforces default cur_wait_time for online games.  It is yet to be decided if we want to allow this to be custom online.
           if currently_spectating then
             P1.panel_buffer = fake_P1.panel_buffer
@@ -923,7 +905,7 @@ function select_screen.main()
           P2.gpanel_buffer = fake_P2.gpanel_buffer
           P1.garbage_target = P2
           P2.garbage_target = P1
-          move_stack(P2, 2)
+          P2:moveForPlayerNumber(2)
           replay = {}
           replay.vs = {
             P = "",
@@ -1070,10 +1052,12 @@ function select_screen.main()
 
     -- Draw the player information buttons
     draw_button(0, 1, 1, 1, "P1")
-    draw_button(0, 2, 2, 1, get_player_state_str(my_player_number, my_rating_difference, my_win_count, op_win_count, my_expected_win_ratio), "left", "top", true)
+    assert(GAME.battleRoom, "need battle room")
+    assert(my_player_number and (my_player_number == 1 or my_player_number == 2), "need number")
+    draw_button(0, 2, 2, 1, get_player_state_str(my_player_number, my_rating_difference, GAME.battleRoom.playerWinCounts[my_player_number], GAME.battleRoom.playerWinCounts[op_player_number], my_expected_win_ratio), "left", "top", true)
     if cursor_data[1].state and op_name then
       draw_button(0, 7, 1, 1, "P2")
-      draw_button(0, 8, 2, 1, get_player_state_str(op_player_number, op_rating_difference, op_win_count, my_win_count, op_expected_win_ratio), "left", "top", true)
+      draw_button(0, 8, 2, 1, get_player_state_str(op_player_number, op_rating_difference, GAME.battleRoom.playerWinCounts[op_player_number], GAME.battleRoom.playerWinCounts[my_player_number], op_expected_win_ratio), "left", "top", true)
     --state = state.." "..json.encode(op_state)
     end
 
@@ -1365,8 +1349,9 @@ function select_screen.main()
 
     -- Handle one player vs game setup
     if cursor_data[1].state.ready and select_screen.character_select_mode == "1p_vs_yourself" then
-      GAME.match = Match("vs")
+      GAME.match = Match("vs", GAME.battleRoom)
       P1 = Stack(1, GAME.match, true, cursor_data[1].state.panels_dir, cursor_data[1].state.level, cursor_data[1].state.character)
+      GAME.match.P1 = P1
       P1.garbage_target = P1
       P2 = nil
       make_local_panels(P1, "000000")
@@ -1378,15 +1363,17 @@ function select_screen.main()
       return main_dumb_transition, {main_local_vs_yourself, "", 0, 0}
     -- Handle two player vs game setup
     elseif cursor_data[1].state.ready and select_screen.character_select_mode == "2p_local_vs" and cursor_data[2].state.ready then
-      GAME.match = Match("vs")
+      GAME.match = Match("vs", GAME.battleRoom)
       P1 = Stack(1, GAME.match, true, cursor_data[1].state.panels_dir, cursor_data[1].state.level, cursor_data[1].state.character)
+      GAME.match.P1 = P1
       P2 = Stack(2, GAME.match, true, cursor_data[2].state.panels_dir, cursor_data[2].state.level, cursor_data[2].state.character)
+      GAME.match.P2 = P2
       P1.garbage_target = P2
       P2.garbage_target = P1
       current_stage = cursor_data[math.random(1, 2)].state.stage
       stage_loader_load(current_stage)
       stage_loader_wait()
-      move_stack(P2, 2)
+      P2:moveForPlayerNumber(2)
       -- TODO: this does not correctly implement starting configurations.
       -- Starting configurations should be identical for visible blocks, and
       -- they should not be completely flat.

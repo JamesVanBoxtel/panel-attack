@@ -14,7 +14,7 @@ this_frame_released_keys = {}
 this_frame_unicodes = {}
 this_frame_messages = {}
 
-server_queue = ServerQueue(SERVER_QUEUE_CAPACITY)
+server_queue = ServerQueue()
 
 score_mode = SCOREMODE_TA
 
@@ -36,14 +36,9 @@ panels_ids = {} -- initialized in panels.lua
 
 current_stage = nil
 
-background_overlay = nil
-foreground_overlay = nil
-
 GAME_ENDED_CLOCK = 0
 
--- win counters
-my_win_count = 0
-op_win_count = 0
+replay = {}
 
 -- sfx play
 SFX_Fanfare_Play = 0

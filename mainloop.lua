@@ -1,7 +1,4 @@
-require("match")
-require("panels")
-require("theme")
-require("click_menu")
+
 local select_screen = require("select_screen")
 local replay_browser = require("replay_browser")
 local options = require("options")
@@ -11,7 +8,7 @@ local main_config_input = require("config_inputs")
 
 local wait, resume = coroutine.yield, coroutine.resume
 
-local main_endless, make_main_puzzle, main_net_vs_setup, main_select_puzz, main_local_vs_setup, main_set_name, main_local_vs_yourself_setup, main_options, main_replay_browser, exit_game
+local main_endless, make_main_puzzle, main_net_vs_setup, main_select_puzz, main_local_vs_computer_setup, main_local_vs_setup, main_set_name, main_local_vs_yourself_setup, main_options, main_replay_browser, exit_game
 -- main_select_mode, main_dumb_transition, main_net_vs, main_net_vs_lobby, main_local_vs_yourself, main_local_vs, main_replay_endless, main_replay_puzzle, main_replay_vs are not local since they are also used elsewhere
 
 local PLAYING = "playing" -- room states
@@ -89,6 +86,13 @@ function fmainloop()
     wait_game_update = GAME_UPDATER:async_download_latest_version()
   end
 
+  -- Run Unit Tests
+  if TESTS_ENABLED then
+    -- Run all unit tests now that we have everything loaded
+    require("ServerQueueTests")
+    require("StackTests")
+  end
+
   while true do
     leftover_time = 1 / 120
     func, arg = func(unpack(arg or {}))
@@ -98,6 +102,7 @@ end
 
 -- Wrapper for doing something at 60hz
 -- The rest of the stuff happens at whatever rate is convenient
+-- Note there should only be one of these in the current loop as it handles key input ect.
 function variable_step(f)
   for i = 1, 4 do
     if leftover_time >= 1 / 60 then
@@ -111,9 +116,9 @@ function variable_step(f)
       leftover_time = leftover_time - 1 / 60
       if leftover_time >= 1 / 60 then
         GAME.droppedFrames = GAME.droppedFrames + 1
-        if GAME.match then
-          print("Dropped Frame, total is: " .. GAME.droppedFrames)
-        end
+        --if GAME.match then
+          --print("Dropped Frame, total is: " .. GAME.droppedFrames)
+        --end
       end
     end
   end
@@ -129,7 +134,8 @@ do
     character_loader_clear()
     stage_loader_clear()
     close_socket()
-    background = themes[config.theme].images.bg_main
+    GAME.backgroundImage = themes[config.theme].images.bg_main
+    GAME.battleRoom = nil
     reset_filters()
     logged_in = 0
     connection_up_time = 0
@@ -140,11 +146,11 @@ do
     local menu_x, menu_y = unpack(main_menu_screen_pos)
     local main_menu
     local ret = nil
-    
+
     local function goEscape()
       main_menu:set_active_idx(#main_menu.buttons)
     end
-  
+
     local function selectFunction(myFunction, args)
       local function constructedFunction()
         main_menu_last_index = main_menu.active_idx
@@ -162,6 +168,7 @@ do
       {loc("mm_1_vs"), main_local_vs_yourself_setup},
       --{loc("mm_2_vs_online", "burke.ro"), main_net_vs_setup, {"burke.ro"}},
       {loc("mm_2_vs_online", ""), main_net_vs_setup, {"18.188.43.50"}},
+      --{loc("mm_2_vs_online", "Shosoul's Server"), main_net_vs_setup, {"149.28.227.184"}},
       --{loc("mm_2_vs_online", "betaserver.panelattack.com"), main_net_vs_setup, {"betaserver.panelattack.com"}},
       --{loc("mm_2_vs_online", "(USE ONLY WITH OTHER CLIENTS ON THIS TEST BUILD 025beta)"), main_net_vs_setup, {"18.188.43.50"}},
       --{loc("mm_2_vs_online", "This test build is for offline-use only"), main_select_mode},
@@ -202,7 +209,7 @@ do
 
       wait()
       variable_step(
-        function()          
+        function()
           main_menu:update()
         end
       )
@@ -232,12 +239,12 @@ function main_select_speed_99(next_func)
   local ret = nil
   local loc_difficulties = {loc("easy"), loc("normal"), loc("hard"), "EX Mode"} -- TODO: localize "EX Mode"
 
-  background = themes[config.theme].images.bg_main
+  GAME.backgroundImage = themes[config.theme].images.bg_main
   reset_filters()
   if themes[config.theme].musics["main"] then
     find_and_add_music(themes[config.theme].musics, "main")
   end
-  
+
   local gameSettingsMenu
 
   local function goEscape()
@@ -255,7 +262,7 @@ function main_select_speed_99(next_func)
   local function updateMenuDifficulty()
     gameSettingsMenu:set_button_setting(2, loc_difficulties[difficulty])
   end
-  
+
   local function increaseSpeed()
     speed = bound(1, speed + 1, 99)
     updateMenuSpeed()
@@ -275,7 +282,7 @@ function main_select_speed_99(next_func)
     difficulty = bound(1, difficulty - 1, 4)
     updateMenuDifficulty()
   end
-    
+
   local function startGame()
     if config.endless_speed ~= speed or config.endless_difficulty ~= difficulty then
       config.endless_speed = speed
@@ -320,9 +327,9 @@ function main_select_speed_99(next_func)
     lastScore = tostring(lastScore)
     record = tostring(record)
     draw_pixel_font("last score", themes[config.theme].images.IMG_pixelFont_blue_atlas, standard_pixel_font_map(), xPosition1, yPosition, 0.5, 1.0)
-    draw_pixel_font(lastScore,    themes[config.theme].images.IMG_pixelFont_blue_atlas, standard_pixel_font_map(), xPosition1, yPosition + 24, 0.5, 1.0)
-    draw_pixel_font("record",     themes[config.theme].images.IMG_pixelFont_blue_atlas, standard_pixel_font_map(), xPosition2, yPosition, 0.5, 1.0)
-    draw_pixel_font(record,       themes[config.theme].images.IMG_pixelFont_blue_atlas, standard_pixel_font_map(), xPosition2, yPosition + 24, 0.5, 1.0)
+    draw_pixel_font(lastScore, themes[config.theme].images.IMG_pixelFont_blue_atlas, standard_pixel_font_map(), xPosition1, yPosition + 24, 0.5, 1.0)
+    draw_pixel_font("record", themes[config.theme].images.IMG_pixelFont_blue_atlas, standard_pixel_font_map(), xPosition2, yPosition, 0.5, 1.0)
+    draw_pixel_font(record, themes[config.theme].images.IMG_pixelFont_blue_atlas, standard_pixel_font_map(), xPosition2, yPosition + 24, 0.5, 1.0)
 
     gameSettingsMenu:draw()
 
@@ -342,9 +349,9 @@ end
 local function use_current_stage()
   stage_loader_load(current_stage)
   stage_loader_wait()
-  background = stages[current_stage].images.background
-  background_overlay = themes[config.theme].images.bg_overlay
-  foreground_overlay = themes[config.theme].images.fg_overlay
+  GAME.backgroundImage = stages[current_stage].images.background
+  GAME.background_overlay = themes[config.theme].images.bg_overlay
+  GAME.foreground_overlay = themes[config.theme].images.fg_overlay
 end
 
 local function pick_random_stage()
@@ -415,6 +422,7 @@ function main_endless(...)
   replay.gpan_buf = ""
   replay.mode = "endless"
   P1 = Stack(1, GAME.match, true, config.panels, ...)
+  GAME.match.P1 = P1
   P1:wait_for_random_character()
   P1.do_countdown = config.ready_countdown_1P or false
   P2 = nil
@@ -467,6 +475,7 @@ function main_time_attack(...)
   pick_random_stage()
   pick_use_music_from()
   P1 = Stack(1, GAME.match, true, config.panels, ...)
+  GAME.match.P1 = P1
   P1:wait_for_random_character()
   make_local_panels(P1, "000000")
   P1:starting_state()
@@ -496,16 +505,12 @@ function main_time_attack(...)
   end
 end
 
-function main_net_vs_room()
-  select_screen.character_select_mode = "2p_net_vs"
-  return select_screen.main()
-end
-
 function main_net_vs_lobby()
   if themes[config.theme].musics.main then
     find_and_add_music(themes[config.theme].musics, "main")
   end
-  background = themes[config.theme].images.bg_main
+  GAME.backgroundImage = themes[config.theme].images.bg_main
+  GAME.battleRoom = nil
   reset_filters()
   character_loader_clear()
   stage_loader_clear()
@@ -541,6 +546,9 @@ function main_net_vs_lobby()
   local lastPlayerIndex = 0
   local updated = true -- need update when first entering
   local ret = nil
+
+  local playerRatingMap = nil
+  json_send({leaderboard_request = true}) -- Request the leaderboard so we can show ratings
 
   while true do
     if connection_up_time <= login_status_message_duration then
@@ -586,9 +594,11 @@ function main_net_vs_lobby()
       end
       if msg.create_room or msg.spectate_request_granted then
         global_initialize_room_msg = msg
+        GAME.battleRoom = BattleRoom()
         select_screen.character_select_mode = "2p_net_vs"
         love.window.requestAttention()
         play_optional_sfx(themes[config.theme].sounds.notification)
+        lobby_menu:remove_self()
         return select_screen.main
       end
       if msg.unpaired then
@@ -613,12 +623,13 @@ function main_net_vs_lobby()
         play_optional_sfx(themes[config.theme].sounds.notification)
       end
       if msg.leaderboard_report then
-        showing_leaderboard = true
+        playerRatingMap = {}
         if lobby_menu then
           lobby_menu:show_controls(true)
         end
         leaderboard_report = msg.leaderboard_report
         for k, v in ipairs(leaderboard_report) do
+          playerRatingMap[v.user_name] = v.rating
           if v.is_you then
             my_rank = k
           end
@@ -635,8 +646,9 @@ function main_net_vs_lobby()
     local function toggleLeaderboard()
       updated = true
       if not showing_leaderboard then
-        json_send({leaderboard_request = true})
         --lobby_menu:set_button_text(#lobby_menu.buttons - 1, loc("lb_hide_board"))
+        showing_leaderboard = true
+        json_send({leaderboard_request = true})
       else
         --lobby_menu:set_button_text(#lobby_menu.buttons - 1, loc("lb_show_board"))
         showing_leaderboard = false
@@ -657,6 +669,7 @@ function main_net_vs_lobby()
         updated = true
         spectator_list = {}
         spectators_string = ""
+        lobby_menu:remove_self()
       end
 
       local function goEscape()
@@ -669,7 +682,7 @@ function main_net_vs_lobby()
       end
 
       local function requestGameFunction(opponentName)
-        return function ()
+        return function()
           my_name = config.name
           op_name = opponentName
           currently_spectating = false
@@ -678,27 +691,35 @@ function main_net_vs_lobby()
           updated = true
         end
       end
-        
+
       local function requestSpectateFunction(room)
-        return function ()
+        return function()
           my_name = room.a
           op_name = room.b
           currently_spectating = true
-          room_number_last_spectated = room.roomNumber
           request_spectate(room.roomNumber)
         end
+      end
+
+      local function playerRatingString(playerName)
+        local rating = ""
+        if playerRatingMap and playerRatingMap[playerName] then
+          rating = " (" .. playerRatingMap[playerName] .. ")"
+        end
+        return rating
       end
 
       lobby_menu = Click_menu(lobby_menu_x[showing_leaderboard], lobby_menu_y, nil, love.graphics.getHeight() - lobby_menu_y - 10, 1)
       for _, v in ipairs(unpaired_players) do
         if v ~= config.name then
-          local unmatchedPlayer = v .. (sent_requests[v] and " " .. loc("lb_request") or "") .. (willing_players[v] and " " .. loc("lb_received") or "")
+          local unmatchedPlayer = v .. playerRatingString(v) .. (sent_requests[v] and " " .. loc("lb_request") or "") .. (willing_players[v] and " " .. loc("lb_received") or "")
           lobby_menu:add_button(unmatchedPlayer, requestGameFunction(v), goEscape)
         end
       end
       for _, room in ipairs(spectatable_rooms) do
         if room.name then
-          local roomName = loc("lb_spectate") .. " " .. room.name .. " (" .. room.state .. ")" --printing room names
+          local roomName = loc("lb_spectate") .. " " .. room.a .. playerRatingString(room.a) .. " vs " .. room.b .. playerRatingString(room.b) .. " (" .. room.state .. ")"
+          --local roomName = loc("lb_spectate") .. " " .. room.name .. " (" .. room.state .. ")" --printing room names
           lobby_menu:add_button(roomName, requestSpectateFunction(room), goEscape)
         end
       end
@@ -710,20 +731,24 @@ function main_net_vs_lobby()
       lobby_menu:add_button(loc("lb_back"), exitLobby, exitLobby)
 
       -- Restore the lobby selection
-      if oldLobbyMenu then
+      -- (If the lobby only had 2 buttons it was before we got lobby info so don't restore the selection)
+      if oldLobbyMenu and #oldLobbyMenu.buttons > 2 then
         if oldLobbyMenu.active_idx == #oldLobbyMenu.buttons then
           lobby_menu:set_active_idx(#lobby_menu.buttons)
         elseif oldLobbyMenu.active_idx == #oldLobbyMenu.buttons - 1 and #lobby_menu.buttons >= 2 then
           lobby_menu:set_active_idx(#lobby_menu.buttons - 1) --the position of the "hide leaderboard" menu item
         else
+          local desiredIndex = bound(1, oldLobbyMenu.active_idx, #lobby_menu.buttons)
+          local previousText = oldLobbyMenu.buttons[oldLobbyMenu.active_idx].stringText
           for i = 1, #lobby_menu.buttons do
             if #oldLobbyMenu.buttons >= i then
-              if lobby_menu.buttons[i].stringText == oldLobbyMenu.buttons[i].stringText then
-                lobby_menu:set_active_idx(i)
+              if lobby_menu.buttons[i].stringText == previousText then
+                desiredIndex = i
                 break
               end
             end
           end
+          lobby_menu:set_active_idx(desiredIndex)
         end
 
         oldLobbyMenu = nil
@@ -780,29 +805,6 @@ function main_net_vs_lobby()
   end
 end
 
-function update_win_counts(win_counts)
-  if (P1 and P1.player_number == 1) or currently_spectating then
-    my_win_count = win_counts[1] or 0
-    op_win_count = win_counts[2] or 0
-  elseif P1 and P1.player_number == 2 then
-    my_win_count = win_counts[2] or 0
-    op_win_count = win_counts[1] or 0
-  end
-end
--- list of spectators
-function spectator_list_string(list)
-  local str = ""
-  for k, v in ipairs(list) do
-    str = str .. v
-    if k < #list then
-      str = str .. "\n"
-    end
-  end
-  if str ~= "" then
-    str = loc("pl_spectators") .. "\n" .. str
-  end
-  return str
-end
 -- creates a leaderboard string that is sorted by rank
 function build_viewable_leaderboard_string(report, first_viewable_idx, last_viewable_idx)
   str = loc("lb_header_board") .. "\n"
@@ -838,10 +840,12 @@ function main_net_vs_setup(ip, network_port)
   end
   P1, P1_level, P2_level, got_opponent = nil
   P2 = {panel_buffer = "", gpanel_buffer = ""}
-  server_queue = ServerQueue(SERVER_QUEUE_CAPACITY)
+  server_queue = ServerQueue()
   gprint(loc("lb_set_connect"), unpack(main_menu_screen_pos))
   wait()
-  network_init(ip, network_port)
+  if not network_init(ip, network_port) then
+    return main_dumb_transition, {main_select_mode, loc("ss_disconnect") .. "\n\n" .. loc("ss_return"), 60, 300}
+  end
   local timeout_counter = 0
   while not connection_is_ready() do
     gprint(loc("lb_connecting"), unpack(main_menu_screen_pos))
@@ -875,7 +879,7 @@ function main_net_vs()
     -- love.timer.sleep(0.030)
     local messages = server_queue:pop_all_with("taunt", "leave_room")
     for _, msg in ipairs(messages) do
-      if msg.taunt then -- send taunts
+      if msg.taunt then -- receive taunts
         local taunts = nil
         -- P1.character and P2.character are supposed to be already filtered with current mods, taunts may differ though!
         if msg.player_number == my_player_number then
@@ -894,48 +898,22 @@ function main_net_vs()
           end
         end
       elseif msg.leave_room then --reset win counts and go back to lobby
-        my_win_count = 0
-        op_win_count = 0
         return main_dumb_transition, {main_net_vs_lobby, "", 0, 0} -- someone left the game, quit to lobby
       end
     end
     --draw graphics
-    local name_and_score = {(my_name or "") .. "\n" .. loc("ss_wins") .. " " .. my_win_count, (op_name or "") .. "\n" .. loc("ss_wins") .. " " .. op_win_count}
     gprint((my_name or ""), P1.score_x + themes[config.theme].name_Pos[1], P1.score_y + themes[config.theme].name_Pos[2])
     gprint((op_name or ""), P2.score_x + themes[config.theme].name_Pos[1], P2.score_y + themes[config.theme].name_Pos[2])
     draw_label(themes[config.theme].images.IMG_wins, (P1.score_x + themes[config.theme].winLabel_Pos[1]) / GFX_SCALE, (P1.score_y + themes[config.theme].winLabel_Pos[2]) / GFX_SCALE, 0, themes[config.theme].winLabel_Scale)
-    draw_number(my_win_count, themes[config.theme].images.IMG_timeNumber_atlas, 12, P1_win_quads, P1.score_x + themes[config.theme].win_Pos[1], P1.score_y + themes[config.theme].win_Pos[2], themes[config.theme].win_Scale, 20 / themes[config.theme].images.timeNumberWidth * themes[config.theme].time_Scale, 26 / themes[config.theme].images.timeNumberHeight * themes[config.theme].time_Scale, "center")
+    draw_number(GAME.battleRoom.playerWinCounts[P1.player_number], themes[config.theme].images.IMG_timeNumber_atlas, 12, P1_win_quads, P1.score_x + themes[config.theme].win_Pos[1], P1.score_y + themes[config.theme].win_Pos[2], themes[config.theme].win_Scale, 20 / themes[config.theme].images.timeNumberWidth * themes[config.theme].time_Scale, 26 / themes[config.theme].images.timeNumberHeight * themes[config.theme].time_Scale, "center")
 
     draw_label(themes[config.theme].images.IMG_wins, (P2.score_x + themes[config.theme].winLabel_Pos[1]) / GFX_SCALE, (P2.score_y + themes[config.theme].winLabel_Pos[2]) / GFX_SCALE, 0, themes[config.theme].winLabel_Scale)
-    draw_number(op_win_count, themes[config.theme].images.IMG_timeNumber_atlas, 12, P2_win_quads, P2.score_x + themes[config.theme].win_Pos[1], P2.score_y + themes[config.theme].win_Pos[2], themes[config.theme].win_Scale, 20 / themes[config.theme].images.timeNumberWidth * themes[config.theme].time_Scale, 26 / themes[config.theme].images.timeNumberHeight * themes[config.theme].time_Scale, "center")
+    draw_number(GAME.battleRoom.playerWinCounts[P2.player_number], themes[config.theme].images.IMG_timeNumber_atlas, 12, P2_win_quads, P2.score_x + themes[config.theme].win_Pos[1], P2.score_y + themes[config.theme].win_Pos[2], themes[config.theme].win_Scale, 20 / themes[config.theme].images.timeNumberWidth * themes[config.theme].time_Scale, 26 / themes[config.theme].images.timeNumberHeight * themes[config.theme].time_Scale, "center")
 
     if not config.debug_mode then --this is printed in the same space as the debug details
       gprint(spectators_string, themes[config.theme].spectators_Pos[1], themes[config.theme].spectators_Pos[2])
     end
-    if match_type == "Ranked" then
-      if global_current_room_ratings[my_player_number] and global_current_room_ratings[my_player_number].new then
-        local rating_to_print = loc("ss_rating") .. "\n"
-        if global_current_room_ratings[my_player_number].new > 0 then
-          rating_to_print = global_current_room_ratings[my_player_number].new
-        end
-        --gprint(rating_to_print, P1.score_x, P1.score_y-30)
-        draw_label(themes[config.theme].images.IMG_rating_1P, (P1.score_x + themes[config.theme].ratingLabel_Pos[1]) / GFX_SCALE, (P1.score_y + themes[config.theme].ratingLabel_Pos[2]) / GFX_SCALE, 0, themes[config.theme].ratingLabel_Scale)
-        if type(rating_to_print) == "number" then
-          draw_number(rating_to_print, themes[config.theme].images.IMG_number_atlas_1P, 10, P1_rating_quads, P1.score_x + themes[config.theme].rating_Pos[1], P1.score_y + themes[config.theme].rating_Pos[2], themes[config.theme].rating_Scale, (15 / themes[config.theme].images.numberWidth_1P * themes[config.theme].rating_Scale), (19 / themes[config.theme].images.numberHeight_1P * themes[config.theme].rating_Scale), "center")
-        end
-      end
-      if global_current_room_ratings[op_player_number] and global_current_room_ratings[op_player_number].new then
-        local op_rating_to_print = loc("ss_rating") .. "\n"
-        if global_current_room_ratings[op_player_number].new > 0 then
-          op_rating_to_print = global_current_room_ratings[op_player_number].new
-        end
-        --gprint(op_rating_to_print, P2.score_x, P2.score_y-30)
-        draw_label(themes[config.theme].images.IMG_rating_2P, (P2.score_x + themes[config.theme].ratingLabel_Pos[1]) / GFX_SCALE, (P2.score_y + themes[config.theme].ratingLabel_Pos[2]) / GFX_SCALE, 0, themes[config.theme].ratingLabel_Scale)
-        if type(op_rating_to_print) == "number" then
-          draw_number(op_rating_to_print, themes[config.theme].images.IMG_number_atlas_2P, 10, P2_rating_quads, P2.score_x + themes[config.theme].rating_Pos[1], P2.score_y + themes[config.theme].rating_Pos[2], themes[config.theme].rating_Scale, (15 / themes[config.theme].images.numberWidth_2P * themes[config.theme].rating_Scale), (19 / themes[config.theme].images.numberHeight_2P * themes[config.theme].rating_Scale), "center")
-        end
-      end
-    end
+
     -- don't spend time rendering when catching up to a current match in replays
     if not (P1 and P1.play_to_end) and not (P2 and P2.play_to_end) then
       GAME.match:render()
@@ -944,8 +922,6 @@ function main_net_vs()
 
     if currently_spectating and menu_escape(K[1]) then
       print("spectator pressed escape during a game")
-      my_win_count = 0
-      op_win_count = 0
       json_send({leave_room = true})
       return main_dumb_transition, {main_net_vs_lobby, "", 0, 0} -- spectator leaving the match
     end
@@ -970,23 +946,13 @@ function main_net_vs()
     local outcome_claim = nil
     local winSFX = nil
     local end_text = nil
-    -- We can't call it until someone has lost and everyone has played up to that point in time.
-    if GAME_ENDED_CLOCK > 0 and P1.CLOCK >= GAME_ENDED_CLOCK and P2.CLOCK >= GAME_ENDED_CLOCK then
-      if P1.game_over_clock == GAME_ENDED_CLOCK and P2.game_over_clock == GAME_ENDED_CLOCK then -- draw
-        end_text = loc("ss_draw")
-        outcome_claim = 0
-      elseif P1.game_over_clock == GAME_ENDED_CLOCK then -- opponent wins
-        winSFX = P2:pick_win_sfx()
-        end_text = loc("ss_p_wins", op_name)
-        op_win_count = op_win_count + 1 -- leaving these in just in case used with an old server that doesn't keep score.  win_counts will get overwritten after this by the server anyway.
-        outcome_claim = P2.player_number
-      elseif P2.game_over_clock == GAME_ENDED_CLOCK then -- client wins
-        winSFX = P1:pick_win_sfx()
-        end_text = loc("ss_p_wins", my_name)
-        my_win_count = my_win_count + 1 -- leave this in
-        outcome_claim = P1.player_number
-      end
+    local matchOutcome = GAME.match:matchOutcome()
+    if matchOutcome then
+      end_text = matchOutcome["end_text"]
+      winSFX = matchOutcome["winSFX"]
+      outcome_claim = matchOutcome["outcome_claim"]
     end
+
     if end_text then
       undo_stonermode()
       json_send({game_over = true, outcome = outcome_claim})
@@ -1026,10 +992,13 @@ end
 
 -- sets up globals for local vs
 function main_local_vs_setup()
+  GAME.battleRoom = BattleRoom()
   currently_spectating = false
   my_name = config.name or "Player 1"
   op_name = "Player 2"
   op_state = nil
+  my_player_number = 1
+  op_player_number = 2
   select_screen.character_select_mode = "2p_local_vs"
   return select_screen.main
 end
@@ -1044,9 +1013,10 @@ function main_local_vs()
     GAME.match:render()
     wait()
     variable_step(
-      function()
+    function()
         P1:run()
         P2:run()
+        assert((P1.CLOCK == P2.CLOCK) or GAME.match:matchOutcome(), "should run at same speed: " .. P1.CLOCK .. " - " .. P2.CLOCK)
         P1:handle_pause()
         P2:handle_pause()
       end
@@ -1055,20 +1025,11 @@ function main_local_vs()
     --TODO: refactor this so it isn't duplicated
     local winSFX = nil
     local end_text = nil
-    -- We can't call it until someone has lost and everyone has played up to that point in time.
-    if GAME_ENDED_CLOCK > 0 and P1.CLOCK >= GAME_ENDED_CLOCK and P2.CLOCK >= GAME_ENDED_CLOCK then
-      if P1.game_over_clock == GAME_ENDED_CLOCK and P2.game_over_clock == GAME_ENDED_CLOCK then
-        end_text = loc("ss_draw")
-        outcome_claim = 0
-      elseif P1.game_over_clock == GAME_ENDED_CLOCK then
-        winSFX = P2:pick_win_sfx()
-        end_text = loc("pl_2_win", op_name)
-        op_win_count = op_win_count + 1
-      elseif P2.game_over_clock == GAME_ENDED_CLOCK then
-        winSFX = P1:pick_win_sfx()
-        end_text = loc("pl_1_win", my_name)
-        my_win_count = my_win_count + 1
-      end
+    local matchOutcome = GAME.match:matchOutcome()
+    if matchOutcome then
+      end_text = matchOutcome["end_text"]
+      winSFX = matchOutcome["winSFX"]
+      outcome_claim = matchOutcome["outcome_claim"]
     end
 
     if end_text then
@@ -1079,9 +1040,11 @@ end
 
 -- sets up globals for vs yourself
 function main_local_vs_yourself_setup()
+  GAME.battleRoom = BattleRoom()
   currently_spectating = false
   my_name = config.name or loc("player_n", "1")
   op_name = nil
+  my_player_number = 1
   op_state = nil
   select_screen.character_select_mode = "1p_vs_yourself"
   return select_screen.main
@@ -1118,17 +1081,6 @@ function main_local_vs_yourself()
   end
 end
 
--- shows debug info for mouse hover
-local function draw_debug_mouse_panel()
-  if debug_mouse_panel then
-    local str = loc("pl_panel_info", debug_mouse_panel[1], debug_mouse_panel[2])
-    for k, v in spairs(debug_mouse_panel[3]) do
-      str = str .. "\n" .. k .. ": " .. tostring(v)
-    end
-    gprintf(str, 10, 10)
-  end
-end
-
 -- replay for 2pvs match
 function main_replay_vs()
   local replay = replay.vs
@@ -1139,15 +1091,18 @@ function main_replay_vs()
   pick_random_stage()
   pick_use_music_from()
   select_screen.fallback_when_missing = {nil, nil}
-  GAME.match = Match("vs")
+  GAME.battleRoom = BattleRoom()
+  GAME.match = Match("vs", GAME.battleRoom)
   P1 = Stack(1, GAME.match, false, config.panels, replay.P1_level or 5)
+  GAME.match.P1 = P1
   P2 = Stack(2, GAME.match, false, config.panels, replay.P2_level or 5)
+  GAME.match.P2 = P2
   P1.do_countdown = replay.do_countdown or false
   P2.do_countdown = replay.do_countdown or false
   P1.ice = true
   P1.garbage_target = P2
   P2.garbage_target = P1
-  move_stack(P2, 2)
+  P2:moveForPlayerNumber(2)
   P1.input_buffer = uncompress_input_string(replay.in_buf)
   P1.panel_buffer = replay.P
   P1.gpanel_buffer = replay.Q
@@ -1175,14 +1130,9 @@ function main_replay_vs()
 
   P1:starting_state()
   P2:starting_state()
-  local end_text = nil
   local run = true
   while true do
-    debug_mouse_panel = nil
-    gprint(my_name or "", P1.score_x, P1.score_y - 28)
-    gprint(op_name or "", P2.score_x, P2.score_y - 28)
     GAME.match:render()
-    draw_debug_mouse_panel()
     wait()
     local ret = nil
     variable_step(
@@ -1206,34 +1156,16 @@ function main_replay_vs()
     if ret then
       return unpack(ret)
     end
-    local winSFX = nil
 
-    --TODO: refactor this so it isn't duplicated
+    local outcome_claim = nil
     local winSFX = nil
     local end_text = nil
-    -- We can't call it until someone has lost and everyone has played up to that point in time.
-    if GAME_ENDED_CLOCK > 0 and P1.CLOCK >= GAME_ENDED_CLOCK and P2.CLOCK >= GAME_ENDED_CLOCK then
-      if P1.game_over_clock == GAME_ENDED_CLOCK and P2.game_over_clock == GAME_ENDED_CLOCK then
-        end_text = loc("ss_draw")
-      elseif P1.game_over_clock == GAME_ENDED_CLOCK then
-        winSFX = P2:pick_win_sfx()
-        if replay.P2_name and replay.P2_name ~= "anonymous" then
-          end_text = loc("ss_p_wins", replay.P2_name)
-        else
-          end_text = loc("pl_2_win")
-        end
-      elseif P2.game_over_clock == GAME_ENDED_CLOCK then
-        winSFX = P1:pick_win_sfx()
-        if replay.P1_name and replay.P1_name ~= "anonymous" then
-          end_text = loc("ss_p_wins", replay.P1_name)
-        else
-          end_text = loc("pl_1_win")
-        end
-      end
-    end
-
-    if end_text then
-      return game_over_transition, {main_select_mode, end_text, 0, -1, winSFX}
+    local matchOutcome = GAME.match:matchOutcome()
+    if matchOutcome then
+      end_text = matchOutcome["end_text"]
+      winSFX = matchOutcome["winSFX"]
+      outcome_claim = matchOutcome["outcome_claim"]
+      return game_over_transition, {main_select_mode, end_text, winSFX}
     end
   end
 end
@@ -1249,6 +1181,7 @@ function main_replay_endless()
   pick_use_music_from()
   GAME.match = Match("endless")
   P1 = Stack(1, GAME.match, false, config.panels, replay.speed, replay.difficulty)
+  GAME.match.P1 = P1
   P1:wait_for_random_character()
   P1.do_countdown = replay.do_countdown or false
   P1.max_runs_per_frame = 1
@@ -1304,8 +1237,8 @@ function main_replay_puzzle()
 
   GAME.match = Match("puzzle")
   P1 = Stack(1, GAME.match, false, config.panels)
+  GAME.match.P1 = P1
   P1:wait_for_random_character()
-  P1.do_countdown = replay.do_countdown or false
   P1.max_runs_per_frame = 1
   P1.input_buffer = uncompress_input_string(replay.in_buf)
   P1.cur_wait_time = replay.cur_wait_time or default_input_repeat_delay
@@ -1313,9 +1246,7 @@ function main_replay_puzzle()
   P2 = nil
   local run = true
   while true do
-    debug_mouse_panel = nil
     GAME.match:render()
-    draw_debug_mouse_panel()
     wait()
     local ret = nil
     variable_step(
@@ -1347,9 +1278,12 @@ function main_replay_puzzle()
     end
   end
 end
+
 -- creates a puzzle game
-function make_main_puzzle(puzzles)
-  local awesome_idx, next_func = 1, nil
+-- puzzleSet is a PuzzleSet
+function make_main_puzzle(puzzleSet, awesome_idx)
+  local next_func = nil
+  awesome_idx = awesome_idx or 1
   function next_func()
     stop_the_music()
     pick_random_stage()
@@ -1361,16 +1295,18 @@ function make_main_puzzle(puzzles)
     local replay = replay.puzzle
     GAME.match = Match("puzzle")
     P1 = Stack(1, GAME.match, true, config.panels)
+    GAME.match.P1 = P1
     P1:wait_for_random_character()
     P1.do_countdown = config.ready_countdown_1P or false
     P2 = nil
     local start_delay = 0
     if awesome_idx == nil then
-      awesome_idx = math.random(#puzzles)
+      awesome_idx = math.random(#puzzleSet.puzzles)
     end
-    P1:set_puzzle_state(unpack(puzzles[awesome_idx]))
+    local puzzleDetails = puzzleSet.puzzles[awesome_idx]
+    P1:set_puzzle_state(puzzleDetails.stack, puzzleDetails.moves, puzzleDetails.doCountdown, puzzleDetails.puzzleType)
     replay.cur_wait_time = P1.cur_wait_time or default_input_repeat_delay
-    replay.puzzle = puzzles[awesome_idx]
+    replay.puzzle = puzzleDetails[awesome_idx] --todo
     replay.in_buf = ""
     while true do
       GAME.match:render()
@@ -1378,38 +1314,42 @@ function make_main_puzzle(puzzles)
       local ret = nil
       variable_step(
         function()
-          if this_frame_keys["escape"] then
+          local k = K[1]
+          -- Reset puzzle button
+          if this_frame_keys[k.taunt_down] or this_frame_keys[k.taunt_up] then 
+            ret = {main_dumb_transition, {make_main_puzzle(puzzleSet, awesome_idx), "", 0, 0}}
+          elseif this_frame_keys["escape"] then
             ret = {main_dumb_transition, {main_select_puzz, "", 0, 0}}
           else
-            if P1.n_active_panels == 0 and P1.prev_active_panels == 0 then
-              if P1:puzzle_done() then -- writes successful puzzle replay and ends game
-                awesome_idx = (awesome_idx % #puzzles) + 1
-                local now = os.date("*t", to_UTC(os.time()))
-                local sep = "/"
-                local path = "replays" .. sep .. "v" .. VERSION .. sep .. string.format("%04d" .. sep .. "%02d" .. sep .. "%02d", now.year, now.month, now.day)
-                path = path .. sep .. "Puzzles"
-                local filename = "v" .. VERSION .. "-" .. string.format("%04d-%02d-%02d-%02d-%02d-%02d", now.year, now.month, now.day, now.hour, now.min, now.sec) .. "-" .. config.name .. "-Successful" .. "-Puzzle"
-                filename = filename .. ".txt"
-                write_replay_file()
-                write_replay_file(path, filename)
-                if awesome_idx == 1 then
-                  ret = {main_dumb_transition, {main_select_puzz, loc("pl_you_win"), 30, -1, P1:pick_win_sfx()}}
-                else
-                  ret = {main_dumb_transition, {next_func, loc("pl_you_win"), 30, -1, P1:pick_win_sfx()}}
-                end
-              elseif P1.puzzle_moves == 0 then -- writes failed puzzle replay and returns to menu
-                local now = os.date("*t", to_UTC(os.time()))
-                local sep = "/"
-                local path = "replays" .. sep .. "v" .. VERSION .. sep .. string.format("%04d" .. sep .. "%02d" .. sep .. "%02d", now.year, now.month, now.day)
-                path = path .. sep .. "Puzzles"
-                local filename = "v" .. VERSION .. "-" .. string.format("%04d-%02d-%02d-%02d-%02d-%02d", now.year, now.month, now.day, now.hour, now.min, now.sec) .. "-" .. config.name .. "-Failed" .. "-Puzzle"
-                filename = filename .. ".txt"
-                write_replay_file()
-                write_replay_file(path, filename)
-                ret = {main_dumb_transition, {main_select_puzz, loc("pl_you_lose"), 30, -1}}
+            if P1:puzzle_done() then -- writes successful puzzle replay and ends game
+              awesome_idx = (awesome_idx % #puzzleSet.puzzles) + 1
+              local now = os.date("*t", to_UTC(os.time()))
+              local sep = "/"
+              local path = "replays" .. sep .. "v" .. VERSION .. sep .. string.format("%04d" .. sep .. "%02d" .. sep .. "%02d", now.year, now.month, now.day)
+              path = path .. sep .. "Puzzles"
+              local filename = "v" .. VERSION .. "-" .. string.format("%04d-%02d-%02d-%02d-%02d-%02d", now.year, now.month, now.day, now.hour, now.min, now.sec) .. "-" .. config.name .. "-Successful" .. "-Puzzle"
+              filename = filename .. ".txt"
+              write_replay_file()
+              write_replay_file(path, filename)
+              if awesome_idx == 1 then
+                ret = {game_over_transition, {main_select_puzz, loc("pl_you_win"), P1:pick_win_sfx()}}
+              else
+                ret = {game_over_transition, {next_func, loc("pl_you_win"), P1:pick_win_sfx()}}
               end
+            elseif P1:puzzle_failed() then -- writes failed puzzle replay and returns to menu
+              local now = os.date("*t", to_UTC(os.time()))
+              local sep = "/"
+              local path = "replays" .. sep .. "v" .. VERSION .. sep .. string.format("%04d" .. sep .. "%02d" .. sep .. "%02d", now.year, now.month, now.day)
+              path = path .. sep .. "Puzzles"
+              local filename = "v" .. VERSION .. "-" .. string.format("%04d-%02d-%02d-%02d-%02d-%02d", now.year, now.month, now.day, now.hour, now.min, now.sec) .. "-" .. config.name .. "-Failed" .. "-Puzzle"
+              filename = filename .. ".txt"
+              write_replay_file()
+              write_replay_file(path, filename)
+              SFX_GameOver_Play = 1
+              ret = {game_over_transition, {make_main_puzzle(puzzleSet, awesome_idx), loc("pl_you_lose")}}
             end
-            if P1.n_active_panels ~= 0 or P1.prev_active_panels ~= 0 or P1.puzzle_moves ~= 0 then
+
+            if not ret then            
               P1:run()
               P1:handle_pause()
               if menu_escape_game(K[1]) then
@@ -1429,7 +1369,7 @@ end
 
 do
   local items = {}
-  for key, val in spairs(puzzle_sets) do
+  for key, val in spairs(GAME.puzzleSets) do
     items[#items + 1] = {key, make_main_puzzle(val)}
   end
   items[#items + 1] = {"back", main_select_mode}
@@ -1437,7 +1377,7 @@ do
     if themes[config.theme].musics.main then
       find_and_add_music(themes[config.theme].musics, "main")
     end
-    background = themes[config.theme].images.bg_main
+    GAME.backgroundImage = themes[config.theme].images.bg_main
     reset_filters()
     local active_idx = last_puzzle_idx or 1
     local k = K[1]
@@ -1484,13 +1424,12 @@ do
   end
 end
 
-
 -- menu for setting the username
 function main_set_name()
   local name = config.name or ""
   love.keyboard.setTextInput(true) -- enables user to type
   while true do
-    local to_print = loc("op_enter_name") .. "\n" .. name
+    local to_print = loc("op_enter_name") .. " (" .. name:len() .. "/" .. NAME_LENGTH_LIMIT .. ")\n" .. name
     if (love.timer.getTime() * 3) % 2 > 1 then
       to_print = to_print .. "|"
     end
@@ -1516,7 +1455,10 @@ function main_set_name()
           end
         end
         for _, v in ipairs(this_frame_unicodes) do
-          name = name .. v
+          -- Don't add more characters than the server char limit
+          if name:len() < NAME_LENGTH_LIMIT then
+            name = name .. v
+          end
         end
       end
     )
@@ -1664,13 +1606,12 @@ function fullscreen()
 end
 
 -- returns true if the user input to exit a local game in progress
-function menu_escape_game(k) 
+function menu_escape_game(k)
   if game_is_paused and menu_escape(K[1]) then
     return true
   end
   return false
 end
-
 
 -- dumb transition that shows a black screen
 function main_dumb_transition(next_func, text, timemin, timemax, winnerSFX)
@@ -1702,7 +1643,7 @@ function main_dumb_transition(next_func, text, timemin, timemax, winnerSFX)
   local k = K[1]
   local font = love.graphics.getFont()
   while true do
-    gprint(text, (canvas_width - font:getWidth(text)) / 2, (canvas_height - font:getHeight(text)) / 2)
+    gprint(text, (canvas_width - font:getWidth(text)) / 2, (canvas_height - font:getHeight()) / 2)
     wait()
     local ret = nil
     variable_step(
@@ -1723,6 +1664,7 @@ function main_dumb_transition(next_func, text, timemin, timemax, winnerSFX)
     end
   end
 end
+
 -- show game over screen, last frame of gameplay
 function game_over_transition(next_func, text, winnerSFX, timemax)
   game_is_paused = false
@@ -1737,16 +1679,19 @@ function game_over_transition(next_func, text, winnerSFX, timemax)
   local t = 0 -- the amount of frames that have passed since the game over screen was displayed
   local k = K[1]
   local font = love.graphics.getFont()
+  local winnerTime = 60
 
   if SFX_GameOver_Play == 1 then
     themes[config.theme].sounds.game_over:play()
     SFX_GameOver_Play = 0
+  else 
+    winnerTime = 0
   end
 
   while true do
     GAME.match:render()
-    gprint(text, (canvas_width - font:getWidth(text)) / 2, (canvas_height - font:getHeight(text)) / 2)
-    gprint(button_text, (canvas_width - font:getWidth(button_text)) / 2, ((canvas_height - font:getHeight(button_text)) / 2) + 30)
+    gprint(text, (canvas_width - font:getWidth(text)) / 2, (canvas_height - font:getHeight()) / 2)
+    gprint(button_text, (canvas_width - font:getWidth(button_text)) / 2, ((canvas_height - font:getHeight()) / 2) + 30)
     wait()
     local ret = nil
     variable_step(
@@ -1763,12 +1708,9 @@ function game_over_transition(next_func, text, winnerSFX, timemax)
         end
 
         -- Play the winner sound effect after a delay
-        winnerSFX = winnerSFX or nil
         if not SFX_mute then
-          local winnerTime = 60
           if t >= winnerTime then
-            -- TODO: somehow winnerSFX can be 0 instead of nil
-            if winnerSFX ~= nil and winnerSFX ~= 0 then -- play winnerSFX then nil it so it doesn't loop
+            if winnerSFX ~= nil then -- play winnerSFX then nil it so it doesn't loop
               print(winnerSFX)
               winnerSFX:play()
               winnerSFX = nil

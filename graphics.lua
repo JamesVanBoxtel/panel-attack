@@ -30,6 +30,10 @@ end
 
 -- Update all the card frames used for doing the card animation
 function Stack.update_cards(self)
+  if self.canvas == nil then
+    return
+  end
+
   for i = self.card_q.first, self.card_q.last do
     local card = self.card_q[i]
     if card_animation[card.frame] then
@@ -72,13 +76,20 @@ function Stack.draw_cards(self)
         end
       end
       -- draw card
-      draw(themes[config.theme].images.IMG_cards[card.chain][card.n], draw_x, draw_y)
+      local iconSize = 48 / GFX_SCALE
+      local cardImage = themes[config.theme].images.IMG_cards[card.chain][card.n]
+      local icon_width, icon_height = cardImage:getDimensions()
+      draw(cardImage, draw_x, draw_y, 0, iconSize / icon_width, iconSize / icon_height)
     end
   end
 end
 
 -- Update all the pop animations
 function Stack.update_popfxs(self)
+  if self.canvas == nil then
+    return
+  end
+  
   for i = self.pop_q.first, self.pop_q.last do
     local popfx = self.pop_q[i]
     if characters[self.character].popfx_style == "burst" or characters[self.character].popfx_style == "fadeburst" then
@@ -223,29 +234,6 @@ function Stack.draw_popfxs(self)
   end
 end
 
--- Positions the stack draw position for the given player
-function move_stack(stack, player_num)
-  local stack_padding_x_for_legacy_pos = ((canvas_width - legacy_canvas_width) / 2)
-  if player_num == 1 then
-    stack.pos_x = 4 + stack_padding_x_for_legacy_pos / GFX_SCALE
-    stack.score_x = 315 + stack_padding_x_for_legacy_pos
-    stack.mirror_x = 1
-    stack.origin_x = stack.pos_x
-    stack.multiplication = 0
-    stack.id = "_1P"
-    stack.VAR_numbers = ""
-  elseif player_num == 2 then
-    stack.pos_x = 172 + stack_padding_x_for_legacy_pos / GFX_SCALE
-    stack.score_x = 410 + stack_padding_x_for_legacy_pos
-    stack.mirror_x = -1
-    stack.origin_x = stack.pos_x + (stack.canvas:getWidth() / GFX_SCALE) - 8
-    stack.multiplication = 1
-    stack.id = "_2P"
-  end
-  stack.pos_y = 4 + (canvas_height - legacy_canvas_height) / GFX_SCALE
-  stack.score_y = 100 + (canvas_height - legacy_canvas_height)
-end
-
 local mask_shader = love.graphics.newShader [[
    vec4 effect(vec4 color, Image texture, vec2 texture_coords, vec2 screen_coords) {
       if (Texel(texture, texture_coords).rgb == vec3(0.0)) {
@@ -258,6 +246,10 @@ local mask_shader = love.graphics.newShader [[
 
 -- Renders the player's stack on screen
 function Stack.render(self)
+  if self.canvas == nil then
+    return
+  end
+
   local function frame_mask(x_pos, y_pos)
     love.graphics.setShader(mask_shader)
     love.graphics.setBackgroundColor(1, 1, 1)
@@ -489,7 +481,7 @@ function Stack.render(self)
           gprint(panel.chaining and "chaining" or "nah", draw_x, draw_y + 30)
         end
         if mx >= draw_x and mx < draw_x + 16 * GFX_SCALE and my >= draw_y and my < draw_y + 16 * GFX_SCALE then
-          debug_mouse_panel = {row, col, panel}
+          GAME.debug_mouse_panel = {row, col, panel}
           draw(panels[self.panels_dir].images.classic[9][1], draw_x + 16, draw_y + 16)
         end
       end
@@ -499,8 +491,10 @@ function Stack.render(self)
   -- draw outside of stack's frame canvas
   if self.match.mode == "puzzle" then
     --gprint(loc("pl_moves", self.puzzle_moves), self.score_x, self.score_y)
-    draw_label(themes[config.theme].images.IMG_moves, (self.origin_x + themes[config.theme].moveLabel_Pos[1]) / GFX_SCALE, (self.pos_y + themes[config.theme].moveLabel_Pos[2]) / GFX_SCALE, 0, themes[config.theme].moveLabel_Scale)
-    draw_number(self.puzzle_moves, themes[config.theme].images.IMG_number_atlas_1P, 10, move_quads, self.score_x + themes[config.theme].move_Pos[1], self.score_y + themes[config.theme].move_Pos[2], themes[config.theme].move_Scale, (30 / themes[config.theme].images.numberWidth_1P * themes[config.theme].move_Scale), (38 / themes[config.theme].images.numberHeight_1P * themes[config.theme].move_Scale), "center", self.multiplication)
+    if self.puzzle_moves then
+      draw_label(themes[config.theme].images.IMG_moves, (self.origin_x + themes[config.theme].moveLabel_Pos[1]) / GFX_SCALE, (self.pos_y + themes[config.theme].moveLabel_Pos[2]) / GFX_SCALE, 0, themes[config.theme].moveLabel_Scale)
+      draw_number(self.puzzle_moves, themes[config.theme].images.IMG_number_atlas_1P, 10, move_quads, self.score_x + themes[config.theme].move_Pos[1], self.score_y + themes[config.theme].move_Pos[2], themes[config.theme].move_Scale, (30 / themes[config.theme].images.numberWidth_1P * themes[config.theme].move_Scale), (38 / themes[config.theme].images.numberHeight_1P * themes[config.theme].move_Scale), "center", self.multiplication)  
+    end
     if config.show_ingame_infos then
     --gprint(loc("pl_frame", self.CLOCK), self.score_x, self.score_y+30)
     end
@@ -720,7 +714,7 @@ function Stack.render(self)
   end
 
   -- Draw the analytics data
-  if config.enable_analytics then
+  if config.enable_analytics and self.drawsAnalytics == true then
     local xPosition = self.score_x - 512
     if self == P2 then
       xPosition = xPosition + 990
@@ -826,10 +820,10 @@ function Stack.drawAnalyticData(self, analytic, x, y)
   end
 
   -- Draw the chain images
-  icon_width, icon_height = themes[config.theme].images.IMG_cards[true][2]:getDimensions()
   for i = 2, 14 do
     local chain_amount = chainData[i]
     if chain_amount and chain_amount > 0 then
+      icon_width, icon_height = themes[config.theme].images.IMG_cards[true][i]:getDimensions()
       draw(themes[config.theme].images.IMG_cards[true][i], x / GFX_SCALE, y / GFX_SCALE, 0, iconSize / icon_width, iconSize / icon_height)
       gprintf(chain_amount, x + iconToTextSpacing, y + 0, canvas_width, "left", nil, 1, fontIncrement)
       y = y + nextIconIncrement
@@ -853,10 +847,10 @@ function Stack.drawAnalyticData(self, analytic, x, y)
   end
 
   -- Draw the combo images
-  icon_width, icon_height = themes[config.theme].images.IMG_cards[false][4]:getDimensions()
   local xCombo = x + column2Distance
   for i, combo_amount in pairs(comboData) do
     if combo_amount and combo_amount > 0 then
+      icon_width, icon_height = themes[config.theme].images.IMG_cards[false][i]:getDimensions()
       draw(themes[config.theme].images.IMG_cards[false][i], xCombo / GFX_SCALE, yCombo / GFX_SCALE, 0, iconSize / icon_width, iconSize / icon_height)
       gprintf(combo_amount, xCombo + iconToTextSpacing, yCombo + 0, canvas_width, "left", nil, 1, fontIncrement)
       yCombo = yCombo + nextIconIncrement

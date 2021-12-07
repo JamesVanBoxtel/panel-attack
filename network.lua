@@ -105,13 +105,28 @@ function printNetworkMessageForType(type)
   return result
 end
 
+-- list of spectators
+function spectator_list_string(list)
+  local str = ""
+  for k, v in ipairs(list) do
+    str = str .. v
+    if k < #list then
+      str = str .. "\n"
+    end
+  end
+  if str ~= "" then
+    str = loc("pl_spectators") .. "\n" .. str
+  end
+  return str
+end
+
 -- Adds the message to the network queue or processes it immediately in a couple cases
 function queue_message(type, data)
   if type == "P" or type == "O" or type == "U" or type == "I" or type == "Q" or type == "R" then
     local dataMessage = {}
     dataMessage[type] = data
     if printNetworkMessageForType(type) then
-      print("Queuing: " .. type .. " with data:" .. data)
+      --print("Queuing: " .. type .. " with data:" .. data)
     end
     server_queue:push(dataMessage)
   elseif type == "L" then
@@ -135,7 +150,7 @@ function queue_message(type, data)
       return
     end
     if printNetworkMessageForType(type) then
-      print("Queuing: " .. type .. " with data:" .. dump(current_message))
+      --print("Queuing: " .. type .. " with data:" .. dump(current_message))
     end
     server_queue:push(current_message)
   end
@@ -195,7 +210,8 @@ function network_init(ip, network_port)
   TCP_sock:settimeout(7)
   if not TCP_sock:connect(ip, network_port or 49569) then --for official server
     --if not TCP_sock:connect(ip,59569) then --for beta server
-    error(loc("nt_conn_timeout"))
+    --error(loc("nt_conn_timeout"))
+    return false
   end
   TCP_sock:settimeout(0)
   got_H = false
@@ -214,6 +230,7 @@ function network_init(ip, network_port)
   }
   sent_json.character_display_name = sent_json.character_is_random and "" or characters[config.character].display_name
   json_send(sent_json)
+  return true
 end
 
 function connection_is_ready()
@@ -271,10 +288,9 @@ function ask_for_gpanels(prev_panels, stack)
 end
 
 function make_local_panels(stack, prev_panels)
-  local ncolors = stack.NCOLORS
   local ret = make_panels(stack.NCOLORS, prev_panels, stack)
   stack.panel_buffer = stack.panel_buffer .. ret
-  local replay = replay[P1.match.mode]
+  local replay = replay[stack.match.mode]
   if replay and replay.pan_buf then
     replay.pan_buf = replay.pan_buf .. ret
   end
@@ -283,7 +299,7 @@ end
 function make_local_gpanels(stack, prev_panels)
   local ret = make_gpanels(stack.NCOLORS, prev_panels)
   stack.gpanel_buffer = stack.gpanel_buffer .. ret
-  local replay = replay[P1.match.mode]
+  local replay = replay[stack.match.mode]
   if replay and replay.gpan_buf then
     replay.gpan_buf = replay.gpan_buf .. ret
   end

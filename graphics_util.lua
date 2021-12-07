@@ -1,7 +1,16 @@
 require("consts")
 
 local function load_img(path_and_name)
-  local img = love.image.newImageData(path_and_name)
+  local img = nil
+  local status = pcall(
+    function()
+      img = love.image.newImageData(path_and_name)
+    end
+  )
+  if not status then
+    print("Error loading image: " .. path_and_name .. 
+      " Check it is valid and try resaving it in an image editor. If you are not the owner please get them to update it or download the latest version.")
+  end
   if img == nil then
     return nil
   end
@@ -371,6 +380,6 @@ function file_exists(name)
 end
 
 function reset_filters()
-  background_overlay = nil
-  foreground_overlay = nil
+  GAME.background_overlay = nil
+  GAME.foreground_overlay = nil
 end

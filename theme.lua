@@ -64,7 +64,7 @@ Theme =
     self.ratingLabel_Scale = 2 -- the scale size of the rating label
     self.rating_Pos = {25, 200} -- the position of the rating value
     self.rating_Scale = 1 -- the scale size of the rating value
-    self.spectators_Pos = {547, 354} -- the position of the spectator list
+    self.spectators_Pos = {547, 500} -- the position of the spectator list
     self.healthbar_frame_Pos = {-20, -4} -- the position of the healthbar frame
     self.healthbar_frame_Scale = 3 -- the scale size of the healtbar frame
     self.healthbar_Pos = {-16, 0} -- the position of the healthbar
@@ -98,7 +98,7 @@ Theme =
   end
 )
 
-background = load_theme_img("background/main")
+GAME.backgroundImage = load_theme_img("background/main")
 
 function Theme.graphics_init(self)
   self.images = {}
@@ -483,7 +483,7 @@ function Theme.json_init(self)
     self.name_Pos = read_data.name_Pos
   end
 
-  -- Ratin label position
+  -- Rating label position
   if read_data.ratingLabel_Pos and type(read_data.ratingLabel_Pos) == "table" then
     self.ratingLabel_Pos = read_data.ratingLabel_Pos
   end
