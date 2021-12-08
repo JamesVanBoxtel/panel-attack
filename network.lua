@@ -355,17 +355,22 @@ end
 function Stack.send_controls(self)
   local k = K[self.which]
 
-  local keysRecord = processKeysPressedRecord()
+  local to_send = 0
+  if false then
+    to_send = base64encode[((keys[k.raise1] or keys[k.raise2] or this_frame_keys[k.raise1] or this_frame_keys[k.raise2]) and 32 or 0) + ((this_frame_keys[k.swap1] or this_frame_keys[k.swap2]) and 16 or 0) + ((keys[k.up] or this_frame_keys[k.up]) and 8 or 0) + ((keys[k.down] or this_frame_keys[k.down]) and 4 or 0) + ((keys[k.left] or this_frame_keys[k.left]) and 2 or 0) + ((keys[k.right] or this_frame_keys[k.right]) and 1 or 0) + 1]
+  else
+    local keysRecord = processKeysPressedRecord()
 
-  local result = processKey(keysRecord, {k.raise1, k.raise2}, 32) +
-                 processKey(keysRecord, {k.swap1, k.swap2}, 16) +
-                 processKey(keysRecord, {k.up}, 8) +
-                 processKey(keysRecord, {k.down}, 4) +
-                 processKey(keysRecord, {k.left}, 2) +
-                 processKey(keysRecord, {k.right}, 1) + 
-                 1
-                 
-  local to_send = base64encode[result]
+    local result = processKey(keysRecord, {k.raise1, k.raise2}, 32) +
+                  processKey(keysRecord, {k.swap1, k.swap2}, 16) +
+                  processKey(keysRecord, {k.up}, 8) +
+                  processKey(keysRecord, {k.down}, 4) +
+                  processKey(keysRecord, {k.left}, 2) +
+                  processKey(keysRecord, {k.right}, 1) + 
+                  1
+                  
+    to_send = base64encode[result]
+  end
 
   if TCP_sock then
     net_send("I" .. to_send)
