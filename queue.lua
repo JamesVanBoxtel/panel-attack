@@ -35,6 +35,10 @@ function Queue.peek(self)
   return self[self.first]
 end
 
+function Queue.peekLast(self)
+  return self[self.last]
+end
+
 function Queue.len(self)
   return self.last - self.first + 1
 end

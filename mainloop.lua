@@ -126,6 +126,7 @@ end
 
 do
   function main_select_mode()
+    GAME.match = nil
     click_menus = {}
     currently_spectating = false
     if themes[config.theme].musics["main"] then

@@ -95,10 +95,25 @@ function love.keypressed(key, scancode, rep)
   end
   if not rep then
     keys[key] = 0
-    if keyReleased[key] == nil then
-      keyReleased[key] = {true}
-    else 
-      table.insert(keyReleased[key], true)
+    
+    if GAME.match then
+      local last = nil
+      if keysPressedQueue:len() > 0 then 
+        last = keysPressedQueue:peekLast()
+      end
+      -- Never seen a key, or seen this key already. Create a new frame
+      if last == nil or last[key] then
+        local newFrame = {}
+        newFrame[key] = true
+        keysPressedQueue:push(newFrame)
+        if keysPressedQueue:len() > 1 then 
+          print("success")
+        end
+      else -- never seen this key, add it
+        last[key] = true
+      end
+
+      print("new input " .. keysPressedQueue:len())
     end
   end
   this_frame_keys[key] = true

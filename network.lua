@@ -330,25 +330,39 @@ function Stack.handle_input_taunt(self)
   end
 end
 
-local function processKeyReleased(keys, valueToAdd) 
+local function processKeysPressedRecord() 
+  local result = nil
+  
+  if keysPressedQueue:len() > 0 then
+    result = keysPressedQueue:pop()
+  end
+
+  return result
+end
+
+
+local function processKey(keysRecord, keys, valueToAdd)
+
   for _, key in pairs(keys) do
-    if keyReleased[key] ~= nil and #keyReleased[key] > 0 then
-      table.remove(keyReleased[key])
+    if keysRecord and keysRecord[key] then
       return valueToAdd
     end
   end
+
   return 0
 end
 
 function Stack.send_controls(self)
   local k = K[self.which]
 
-  local result = processKeyReleased({k.raise1, k.raise2}, 32) +
-                 processKeyReleased({k.swap1, k.swap2}, 16) +
-                 processKeyReleased({k.up}, 8) +
-                 processKeyReleased({k.down}, 4) +
-                 processKeyReleased({k.left}, 2) +
-                 processKeyReleased({k.right}, 1) + 
+  local keysRecord = processKeysPressedRecord()
+
+  local result = processKey(keysRecord, {k.raise1, k.raise2}, 32) +
+                 processKey(keysRecord, {k.swap1, k.swap2}, 16) +
+                 processKey(keysRecord, {k.up}, 8) +
+                 processKey(keysRecord, {k.down}, 4) +
+                 processKey(keysRecord, {k.left}, 2) +
+                 processKey(keysRecord, {k.right}, 1) + 
                  1
                  
   local to_send = base64encode[result]
