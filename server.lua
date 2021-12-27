@@ -1458,7 +1458,12 @@ end
   print("process_game_over_message outcome for "..sender.room.name..": "..sender.room.game_outcome_reports["official outcome"])
 end
 --]]
-local server_socket = socket.bind("*", SERVER_PORT or 49569) --for official server
+
+local server_socket
+
+function load_server()
+
+server_socket = socket.bind("*", SERVER_PORT or 49569) --for official server
 --local server_socket = socket.bind("*", 59569) --for beta server
 local sep = package.config:sub(1, 1)
 print("sep: " .. sep)
@@ -1508,8 +1513,20 @@ print("initialized!")
 -- print("get_timezone_offset(os.time()) output: "..get_timezone_offset(os.time()))
 -- print("get_tzoffset(get_timezone()) output:"..get_tzoffset(get_timezone()))
 
+end
+
+
+
+-- Called at the beginning to load the game
+function love.load()
+  load_server()
+end
+
+
+-- Called every few fractions of a second to update the game
+-- dt is the amount of time in seconds that has passed.
 local prev_now = time()
-while true do
+function love.update(dt)
   server_socket:settimeout(0)
   local new_conn = server_socket:accept()
   if new_conn then
