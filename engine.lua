@@ -910,6 +910,9 @@ function Stack.controls(self)
     if self.cur_timer ~= self.cur_wait_time then
       self.cur_timer = self.cur_timer + 1
     end
+    if GAME.TASMode then
+      self.cur_timer = 0
+    end
   else
     self.cur_dir = new_dir
     self.cur_timer = 0

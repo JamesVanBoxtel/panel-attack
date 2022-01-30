@@ -463,14 +463,16 @@ local function main_endless_time_setup(mode, speed, difficulty)
   local function processGameResults(gameResult) 
     local extraPath, extraFilename
     local stack = P1
-    if GAME.match.mode == "endless" then
-      GAME.scores:saveEndlessScoreForLevel(P1.score, P1.difficulty)
-      extraPath = "Endless"
-      extraFilename = "Spd" .. stack.speed .. "-Dif" .. stack.difficulty .. "-endless"
-    elseif GAME.match.mode == "time" then
-      GAME.scores:saveTimeAttack1PScoreForLevel(P1.score, P1.difficulty)
-      extraPath = "Time Attack"
-      extraFilename = "Spd" .. stack.speed .. "-Dif" .. stack.difficulty .. "-timeattack"
+    if not GAME.TASMode then
+      if GAME.match.mode == "endless" then
+        GAME.scores:saveEndlessScoreForLevel(P1.score, P1.difficulty)
+        extraPath = "Endless"
+        extraFilename = "Spd" .. stack.speed .. "-Dif" .. stack.difficulty .. "-endless"
+      elseif GAME.match.mode == "time" then
+        GAME.scores:saveTimeAttack1PScoreForLevel(P1.score, P1.difficulty)
+        extraPath = "Time Attack"
+        extraFilename = "Spd" .. stack.speed .. "-Dif" .. stack.difficulty .. "-timeattack"
+      end
     end
     finalizeAndWriteReplay(extraPath, extraFilename)
 

@@ -603,6 +603,57 @@ player_right =
   nil
 )
 
+player_up_once =
+  input_key_func(
+  {},
+  {"up"},
+  normal_key,
+  nil
+)
+player_down_once =
+  input_key_func(
+  {},
+  {"down"},
+  normal_key,
+  nil
+)
+player_left_once =
+  input_key_func(
+  {},
+  {"left"},
+  normal_key,
+  nil
+)
+player_right_once =
+  input_key_func(
+  {},
+  {"right"},
+  normal_key,
+  nil
+)
+
+advance_input =
+  input_key_func(
+  {},
+  {"taunt_up", "taunt_down"},
+  repeating_key,
+  nil
+)
+
+function playerDidInput(playerNumber)
+  if player_raise(playerNumber) or 
+     player_swap(playerNumber) or
+     player_up_once(playerNumber) or
+     player_down_once(playerNumber) or
+     player_left_once(playerNumber) or
+     player_right_once(playerNumber) or
+     advance_input(playerNumber) then
+       return true
+  end
+
+  return false
+end
+
 -- returns true if the user input to exit a local game in progress
 function menu_escape_game()
   if GAME.gameIsPaused and menu_escape() then

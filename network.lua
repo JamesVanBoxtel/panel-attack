@@ -287,7 +287,15 @@ function Stack.idleInput(self)
 end
 
 function Stack.send_controls(self)
+  
   local playerNumber = self.which
+
+  if GAME.TASMode then
+    if playerDidInput(playerNumber) == false then
+      return
+    end
+  end
+
   local to_send = base64encode[
     (player_raise(playerNumber) and 32 or 0) + 
     (player_swap(playerNumber) and 16 or 0) + 
@@ -301,7 +309,9 @@ function Stack.send_controls(self)
     net_send("I" .. to_send)
   end
 
-  self:handle_input_taunt()
+  if not GAME.TASMode then
+    self:handle_input_taunt()
+  end
 
   self:receiveConfirmedInput(to_send)
 end

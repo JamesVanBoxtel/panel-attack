@@ -13,6 +13,7 @@ Game =
     self.puzzleSets = {} -- all the puzzles loaded into the game
     self.gameIsPaused = false -- game can be paused while playing on local
     self.renderDuringPause = false -- if the game can render when you are paused
+    self.TASMode = true
   end
 )
 
