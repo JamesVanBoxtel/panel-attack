@@ -286,12 +286,15 @@ function Stack.idleInput(self)
   return base64encode[1]
 end
 
+local waitClock = 0
 function Stack.send_controls(self)
   
   local playerNumber = self.which
 
+  waitClock = waitClock + 1
+
   if GAME.TASMode then
-    if playerDidInput(playerNumber) == false then
+    if playerDidInput(playerNumber) == false and waitClock % 2 ~= 0 then
       return
     end
   end
@@ -299,10 +302,10 @@ function Stack.send_controls(self)
   local to_send = base64encode[
     (player_raise(playerNumber) and 32 or 0) + 
     (player_swap(playerNumber) and 16 or 0) + 
-    (player_up(playerNumber) and 8 or 0) + 
-    (player_down(playerNumber) and 4 or 0) + 
-    (player_left(playerNumber) and 2 or 0) + 
-    (player_right(playerNumber) and 1 or 0) + 1
+    (player_up_once(playerNumber) and 8 or 0) + 
+    (player_down_once(playerNumber) and 4 or 0) + 
+    (player_left_once(playerNumber) and 2 or 0) + 
+    (player_right_once(playerNumber) and 1 or 0) + 1
     ]
 
   if TCP_sock then
