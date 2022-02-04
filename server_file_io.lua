@@ -1,5 +1,6 @@
 local lfs = require("lfs")
 local csvfile = require("simplecsv")
+local logger = require("logger")
 
 function os_rename(old_name, new_name)
   os.rename(old_name, new_name)
@@ -45,10 +46,10 @@ end
 function write_players_file()
   pcall(
     function()
-      local f = assert(io.open("players.txt", "w"))
-      io.output(f)
-      io.write(json.encode(playerbase.players))
-      io.close(f)
+      local file = love.filesystem.newFile("players.txt")
+      file:open("w")
+      file:write(json.encode(playerbase.players))
+      file:close()
     end
   )
 end
@@ -56,10 +57,15 @@ end
 function read_players_file()
   pcall(
     function()
-      local f = assert(io.open("players.txt", "r"))
-      io.input(f)
-      playerbase.players = json.decode(io.read("*all"))
-      io.close(f)
+      local file = love.filesystem.newFile("players.txt")
+      file:open("r")
+      local teh_json = file:read(file:getSize())
+      local decode = json.decode(teh_json)
+      file:close()
+      if decode then
+        logger.info("loaded players file")
+        playerbase.players = decode
+      end
     end
   )
 end
@@ -79,9 +85,11 @@ function read_deleted_players_file()
   pcall(
     function()
       local f = assert(io.open("deleted_players.txt", "r"))
+      local temp = io.input()
       io.input(f)
       playerbase.deleted_players = json.decode(io.read("*all"))
       io.close(f)
+      io.input(temp)
     end
   )
 end
@@ -140,9 +148,11 @@ function read_leaderboard_file()
       else
         print("failed to read any data from leaderboard.csv, checking for a leaderboard.txt")
         local f = assert(io.open("leaderboard.txt", "r"))
+        local temp = io.input()
         io.input(f)
         leaderboard.players = json.decode(io.read("*all"))
         io.close(f)
+        io.input(temp)
       end
     end
   )
@@ -238,9 +248,11 @@ function read_csprng_seed_file()
     function()
       local f = io.open("csprng_seed.txt", "r")
       if f then
+        local temp = io.input()
         io.input(f)
         csprng_seed = io.read("*all")
         io.close(f)
+        io.input(temp)
       else
         print("csprng_seed.txt could not be read.  Writing a new default (2000) csprng_seed.txt")
         local new_file = io.open("csprng_seed.txt", "w")
