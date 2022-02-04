@@ -5,6 +5,136 @@ local wait = coroutine.yield
 
 local memory_before_options_menu = nil
 
+-- opens up music test menu
+local function main_music_test()
+  gprint(loc("op_music_load"), unpack(main_menu_screen_pos))
+  wait()
+  -- load music for characters/stages that are not fully loaded
+  for _, character_id in ipairs(characters_ids_for_current_theme) do
+    if not characters[character_id].fully_loaded then
+      characters[character_id]:sound_init(true, false)
+    end
+  end
+  for _, stage_id in ipairs(stages_ids_for_current_theme) do
+    if not stages[stage_id].fully_loaded then -- we perform the same although currently no stage are being loaded at this point
+      stages[stage_id]:sound_init(true, false)
+    end
+  end
+
+  local index = 1
+  local tracks = {}
+
+  for _, character_id in ipairs(characters_ids_for_current_theme) do
+    local character = characters[character_id]
+    if character.musics.normal_music then
+      tracks[#tracks + 1] = {
+        is_character = true,
+        name = character.display_name .. ": normal_music",
+        id = character_id,
+        type = "normal_music",
+        start = character.musics.normal_music_start or zero_sound,
+        loop = character.musics.normal_music
+      }
+    end
+    if character.musics.danger_music then
+      tracks[#tracks + 1] = {
+        is_character = true,
+        name = character.display_name .. ": danger_music",
+        id = character_id,
+        type = "danger_music",
+        start = character.musics.danger_music_start or zero_sound,
+        loop = character.musics.danger_music
+      }
+    end
+  end
+  for _, stage_id in ipairs(stages_ids_for_current_theme) do
+    local stage = stages[stage_id]
+    if stage.musics.normal_music then
+      tracks[#tracks + 1] = {
+        is_character = false,
+        name = stage.display_name .. ": normal_music",
+        id = stage_id,
+        type = "normal_music",
+        start = stage.musics.normal_music_start or zero_sound,
+        loop = stage.musics.normal_music
+      }
+    end
+    if stage.musics.danger_music then
+      tracks[#tracks + 1] = {
+        is_character = false,
+        name = stage.display_name .. ": danger_music",
+        id = stage_id,
+        type = "danger_music",
+        start = stage.musics.danger_music_start or zero_sound,
+        loop = stage.musics.danger_music
+      }
+    end
+  end
+
+  -- stop main music
+  stop_all_audio()
+
+  -- initial song starts here
+  find_and_add_music(tracks[index].is_character and characters[tracks[index].id].musics or stages[tracks[index].id].musics, tracks[index].type)
+
+  while true do
+    tp = loc("op_music_current") .. tracks[index].name
+    tp = tp .. (table.getn(currently_playing_tracks) == 1 and "\n" .. loc("op_music_intro") .. "\n" or "\n" .. loc("op_music_loop") .. "\n")
+    min_time = math.huge
+    for k, _ in pairs(music_t) do
+      if k and k < min_time then
+        min_time = k
+      end
+    end
+    tp = tp .. string.format("%d", min_time - love.timer.getTime())
+    tp = tp .. "\n\n\n" .. loc("op_music_nav", "<", ">", "ESC")
+    gprint(tp, unpack(main_menu_screen_pos))
+    wait()
+    local ret = nil
+    variable_step(
+      function()
+        if menu_left() or menu_right() or menu_escape() then
+          stop_the_music()
+        end
+        if menu_left() then
+          index = index - 1
+        end
+        if menu_right() then
+          index = index + 1
+        end
+        if index > #tracks then
+          index = 1
+        end
+        if index < 1 then
+          index = #tracks
+        end
+        if menu_left() or menu_right() then
+          find_and_add_music(tracks[index].is_character and characters[tracks[index].id].musics or stages[tracks[index].id].musics, tracks[index].type)
+        end
+
+        if menu_escape() then
+          -- unloads music for characters/stages that are not fully loaded (they have been loaded when entering this submenu)
+          for _, character_id in ipairs(characters_ids_for_current_theme) do
+            if not characters[character_id].fully_loaded then
+              characters[character_id]:sound_uninit()
+            end
+          end
+          for _, stage_id in ipairs(stages_ids_for_current_theme) do
+            if not stages[stage_id].fully_loaded then
+              stages[stage_id]:sound_uninit()
+            end
+          end
+
+          ret = {main_select_mode}
+        end
+      end
+    )
+    if ret then
+      return unpack(ret)
+    end
+  end
+end
+
 local function main_show_custom_themes_readme(idx)
   GAME.backgroundImage = themes[config.theme].images.bg_readme
   reset_filters()
@@ -14,6 +144,9 @@ local function main_show_custom_themes_readme(idx)
     gprint(loc("op_copy_files"), 280, 280)
     wait()
     recursive_copy("themes/" .. default_theme_dir, "themes/" .. prefix_of_ignored_dirs .. default_theme_dir)
+
+    -- Android can't easily copy into the save dir, so do it for them to help.
+    recursive_copy("default_data/themes", "themes")
   end
 
   local readme = read_txt_file("readme_themes.txt")
@@ -24,7 +157,7 @@ local function main_show_custom_themes_readme(idx)
     local ret = nil
     variable_step(
       function()
-        if menu_escape(K[1]) or menu_enter(K[1]) then
+        if menu_escape() or menu_enter() then
           ret = {options.main, {idx}}
         end
       end
@@ -39,16 +172,6 @@ local function main_show_custom_stages_readme(idx)
   GAME.backgroundImage = themes[config.theme].images.bg_readme
   reset_filters()
 
-  local default_stages_list = love.filesystem.getDirectoryItems("default_data/stages")
-  for _, stage in ipairs(default_stages_list) do
-    if not love.filesystem.getInfo("stages/" .. prefix_of_ignored_dirs .. stage) then
-      print("Hold on. Copying example folders to make this easier...\n This make take a few seconds.")
-      gprint(loc("op_copy_files"), 280, 280)
-      wait()
-      recursive_copy("default_data/stages/" .. stage, "stages/" .. prefix_of_ignored_dirs .. stage)
-    end
-  end
-
   local readme = read_txt_file("readme_stages.txt")
   while true do
     gprint(readme, 15, 15)
@@ -57,7 +180,7 @@ local function main_show_custom_stages_readme(idx)
     local ret = nil
     variable_step(
       function()
-        if menu_escape(K[1]) or menu_enter(K[1]) then
+        if menu_escape() or menu_enter() then
           ret = {options.main, {idx}}
         end
       end
@@ -72,16 +195,6 @@ local function main_show_custom_characters_readme(idx)
   GAME.backgroundImage = themes[config.theme].images.bg_readme
   reset_filters()
 
-  local default_characters_list = love.filesystem.getDirectoryItems("default_data/characters")
-  for _, current_character in ipairs(default_characters_list) do
-    if not love.filesystem.getInfo("characters/" .. prefix_of_ignored_dirs .. current_character) then
-      print("Hold on. Copying example folders to make this easier...\n This make take a few seconds.")
-      gprint(loc("op_copy_files"), 280, 280)
-      wait()
-      recursive_copy("default_data/characters/" .. current_character, "characters/" .. prefix_of_ignored_dirs .. current_character)
-    end
-  end
-
   local readme = read_txt_file("readme_characters.txt")
   while true do
     gprint(readme, 15, 15)
@@ -90,7 +203,7 @@ local function main_show_custom_characters_readme(idx)
     local ret = nil
     variable_step(
       function()
-        if menu_escape(K[1]) or menu_enter(K[1]) then
+        if menu_escape() or menu_enter() then
           ret = {options.main, {idx}}
         end
       end
@@ -105,18 +218,6 @@ local function main_show_custom_panels_readme(idx)
   GAME.backgroundImage = themes[config.theme].images.bg_readme
   reset_filters()
 
-  -- add other defaults panels sets here so that anyone can update them if wanted
-  local default_panels_dirs = {default_panels_dir, "pdp_ta"}
-
-  for _, panels_dir in ipairs(default_panels_dirs) do
-    if not love.filesystem.getInfo("panels/" .. prefix_of_ignored_dirs .. panels_dir) then
-      print("Hold on. Copying example folders to make this easier...\n This make take a few seconds.")
-      gprint(loc("op_copy_files"), 280, 280)
-      wait()
-      recursive_copy("panels/" .. panels_dir, "panels/" .. prefix_of_ignored_dirs .. panels_dir)
-    end
-  end
-
   local readme = read_txt_file("readme_panels.txt")
   while true do
     gprint(readme, 15, 15)
@@ -125,7 +226,7 @@ local function main_show_custom_panels_readme(idx)
     local ret = nil
     variable_step(
       function()
-        if menu_escape(K[1]) or menu_enter(K[1]) then
+        if menu_escape() or menu_enter() then
           ret = {options.main, {idx}}
         end
       end
@@ -187,7 +288,6 @@ function options.main(starting_idx)
   reset_filters()
 
   local items, active_idx = {}, starting_idx or 1
-  local k = K[1]
   local selected, deselected_this_frame, adjust_active_value = false, false, false
   local save_replays_publicly_choices = {{"with my name", "op_replay_public_with_name"}, {"anonymously", "op_replay_public_anonymously"}, {"not at all", "op_replay_public_no"}}
   local use_music_from_choices = {{"stage", "op_only_stage"}, {"often_stage", "op_often_stage"}, {"either", "op_stage_characters"}, {"often_characters", "op_often_characters"}, {"characters", "op_only_characters"}}
@@ -361,15 +461,15 @@ function options.main(starting_idx)
     local ret = nil
     variable_step(
       function()
-        if menu_up(K[1]) and not selected then
+        if menu_up() and not selected then
           active_idx = wrap(1, active_idx - 1, #items)
-        elseif menu_down(K[1]) and not selected then
+        elseif menu_down() and not selected then
           active_idx = wrap(1, active_idx + 1, #items)
-        elseif menu_left(K[1]) and (selected or not items[active_idx][8]) then --or not selectable
+        elseif menu_left() and (selected or not items[active_idx][8]) then --or not selectable
           adjust_left()
-        elseif menu_right(K[1]) and (selected or not items[active_idx][8]) then --or not selectable
+        elseif menu_right() and (selected or not items[active_idx][8]) then --or not selectable
           adjust_right()
-        elseif menu_enter(K[1]) then
+        elseif menu_enter() then
           if items[active_idx][8] then --is selectable
             selected = not selected
             if not selected then
@@ -383,7 +483,7 @@ function options.main(starting_idx)
           elseif active_idx == #items then
             ret = {exit_options_menu}
           end
-        elseif menu_escape(K[1]) then
+        elseif menu_escape() then
           if selected then
             selected = not selected
             deselected_this_frame = true
