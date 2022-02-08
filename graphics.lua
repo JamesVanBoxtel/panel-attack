@@ -4,7 +4,6 @@ require("util")
 local floor = math.floor
 local ceil = math.ceil
 
-
 local shake_arr = {}
 
 -- Setup the shake_arr data used for rendering the stack shake animation
@@ -830,7 +829,7 @@ function Stack.drawAnalyticData(self, analytic, x, y)
   y = y + nextIconIncrement
 
   -- GPM
-  if analytic.lastGPM == 0 or math.fmod(self.CLOCK, 60) == 0 then
+  if analytic.lastGPM == 0 or math.fmod(self.CLOCK, 60) < self.max_runs_per_frame then
     if self.CLOCK > 0 and (analytic.data.sent_garbage_lines > 0) then
       local garbagePerMinute = analytic.data.sent_garbage_lines / (self.CLOCK / 60 / 60)
       analytic.lastGPM = string.format("%0.1f", round(garbagePerMinute, 1))
@@ -859,7 +858,7 @@ function Stack.drawAnalyticData(self, analytic, x, y)
   y = y + nextIconIncrement
 
   -- APM
-  if analytic.lastAPM == 0 or math.fmod(self.CLOCK, 60) == 0 then
+if analytic.lastAPM == 0 or math.fmod(self.CLOCK, 60) < self.max_runs_per_frame then
     if self.CLOCK > 0 and (analytic.data.swap_count + analytic.data.move_count > 0) then
       local actionsPerMinute = (analytic.data.swap_count + analytic.data.move_count) / (self.CLOCK / 60 / 60)
       analytic.lastAPM = string.format("%0.0f", round(actionsPerMinute, 0))
@@ -993,11 +992,6 @@ function Stack.render_telegraph(self)
   end
 
   for frame_earned, attacks_this_frame in pairs(telegraph_to_render.attacks) do
-    -- print("frame_earned:")
-    -- print(frame_earned)
-    -- print(#card_animation)
-    -- print(self.CLOCK)
-    -- print(GARBAGE_TRANSIT_TIME)
     local frames_since_earned = self.CLOCK - frame_earned
       if frames_since_earned <= #card_animation then
         --don't draw anything yet, card animation is still in progress.
@@ -1054,10 +1048,7 @@ function Stack.render_telegraph(self)
   end
 
   --then draw the telegraph's garbage queue, leaving an empty space until such a time as the attack arrives (earned_frame-GARBAGE_TRANSIT_TIME)
-  -- print("BBBBBB")
-  -- print("telegraph_to_render.garbage_queue.ghost_chain: "..(telegraph_to_render.garbage_queue.ghost_chain or "nil"))
   local g_queue_to_draw = telegraph_to_render.garbage_queue:makeCopy()
-  --print("g_queue_to_draw.ghost_chain: "..(g_queue_to_draw.ghost_chain or "nil"))
   local current_block = g_queue_to_draw:pop()
   local draw_x = telegraph_to_render.pos_x
   local draw_y = telegraph_to_render.pos_y
@@ -1067,7 +1058,8 @@ function Stack.render_telegraph(self)
     --TODO: create a way to draw telegraphs from right to left
     if self.CLOCK - current_block.frame_earned >= GARBAGE_TRANSIT_TIME then
       if not current_block[3]--[[is_metal]] then
-        draw(characters[senderCharacter].telegraph_garbage_images[current_block[2]--[[height]]][current_block[1]--[[width]]], draw_x, draw_y)
+        local height = math.min(current_block[2], 14)
+        draw(characters[senderCharacter].telegraph_garbage_images[height--[[height]]][current_block[1]--[[width]]], draw_x, draw_y)
       else
         draw(characters[senderCharacter].telegraph_garbage_images["metal"], draw_x, draw_y)
       end
@@ -1079,6 +1071,9 @@ function Stack.render_telegraph(self)
 
         if current_block[4]--[[chain]] then
           stopperTime = telegraph_to_render.stoppers.chain[telegraph_to_render.garbage_queue.chain_garbage.first]
+          if current_block.finalized then
+            stopperTime = stopperTime .. " F"
+          end
         else
           if current_block[3]--[[is_metal]] then
             stopperTime = telegraph_to_render.stoppers.metal
@@ -1098,8 +1093,15 @@ function Stack.render_telegraph(self)
   end
   
   if not drewChain and telegraph_to_render.garbage_queue.ghost_chain then
-    print("SHOULD BE DRAWING GHOST_CHAIN - SIZE: "..telegraph_to_render.garbage_queue.ghost_chain)
-    draw(characters[senderCharacter].telegraph_garbage_images[telegraph_to_render.garbage_queue.ghost_chain][6], telegraph_to_render.pos_x, telegraph_to_render.pos_y)
+    local draw_x = telegraph_to_render.pos_x
+    local draw_y = telegraph_to_render.pos_y
+    local height = math.min(telegraph_to_render.garbage_queue.ghost_chain, 14)
+    draw(characters[senderCharacter].telegraph_garbage_images[height][6], draw_x, draw_y)
+
+    -- Render a "G" for ghost
+    if config.debug_mode then
+      gprintf("G", draw_x*GFX_SCALE, (draw_y-8)*GFX_SCALE, 70, "center", nil, 1, large_font)
+    end
   end
 
 end
@@ -1112,4 +1114,3 @@ function draw_pause()
   gprintf(loc("pause"), 0, 330, canvas_width, "center", nil, 1, large_font)
   gprintf(loc("pl_pause_help"), 0, 360, canvas_width, "center", nil, 1)
 end
-

@@ -16,7 +16,9 @@ local clone_pool = {}
 Stack =
   class(
   function(s, which, match, is_local, panels_dir, speed, difficulty, player_number, wantsCanvas)
-    wantsCanvas = wantsCanvas or 1
+    if wantsCanvas == nil then
+      wantsCanvas = true
+    end
     s.match = match
     s.character = config.character
     s.max_health = 1
@@ -82,7 +84,7 @@ Stack =
       {1, idx = 1}
     }
 
-    s.later_garbage = {} -- Queue of garbage that is done waiting in telegraph, and been popped out, and will be sent to the other player next frame
+    s.later_garbage = {} -- Queue of garbage that is done waiting in telegraph, and been popped out, and will be sent to our stack next frame
     s.garbage_q = GarbageQueue(s) -- Queue of garbage that is about to be dropped
 
     s:moveForPlayerNumber(which)
@@ -92,7 +94,7 @@ Stack =
     s.gpanel_buffer = ""
     s.gpanel_buffer_record = ""
     s.input_buffer = ""
-    s.confirmedInput = "" -- All inputs the player has input that are confirmed by remote
+    s.confirmedInput = "" -- All inputs the player has input ever
     s.panels = {}
     s.width = 6
     s.height = 12
@@ -179,7 +181,6 @@ Stack =
     s.cur_col = 3 -- the column the left half of the cursor's on
     s.top_cur_row = s.height + (s.match.mode == "puzzle" and 0 or -1)
 
-    s.move_sound = false -- this is set if the cursor movement sound should be played
     s.poppedPanelIndex = s.poppedPanelIndex or 1
     s.panels_cleared = s.panels_cleared or 0
     s.metal_panels_queued = s.metal_panels_queued or 0
@@ -205,7 +206,7 @@ Stack =
     s.analytic = AnalyticsInstance(s.is_local)
 
     if s.match.mode == "vs" then
-      s.telegraph = Telegraph(s, s) -- Telegraph holds the garbage that hasn't been set yet and also tracks the attack animations
+      s.telegraph = Telegraph(s, s) -- Telegraph holds the garbage that hasn't been committed yet and also tracks the attack animations
       -- NOTE: this is the telegraph above this stack, so the opponents puts garbage in this stack.
     end
 
@@ -223,9 +224,11 @@ Stack =
 	        size - the chain size 2, 3, etc
     ]]
 
-    s.seed = 0 -- TODO have server send
     s.panelGenCount = 0
     s.garbageGenCount = 0
+
+    s.rollbackCount = 0 -- the number of times total we have done rollback
+    s.lastRollbackFrame = -1 -- the last frame we had to rollback from
 
   end)
 
@@ -269,6 +272,12 @@ function Stack.divergenceString(self, stackToTest)
       end
   end
 
+  if stackToTest.telegraph then
+    result = result .. "telegraph.chain count " .. stackToTest.telegraph.garbage_queue.chain_garbage:len() .. "\n"
+    result = result .. "telegraph.senderCurrentlyChaining " .. tostring(stackToTest.telegraph.senderCurrentlyChaining) .. "\n"
+    result = result .. "telegraph.attacks " .. tableLength(stackToTest.telegraph.attacks) .. "\n"
+  end
+  
   result = result .. "garbage_q " .. stackToTest.garbage_q:len() .. "\n"
   result = result .. "later_garbage " .. tableLength(stackToTest.later_garbage) .. "\n"
   result = result .. "Stop " .. stackToTest.stop_time .. "\n"
@@ -304,8 +313,8 @@ function Stack.rollbackCopy(self, source, other)
   else
 
   end--]]
-  other.later_garbage = source.later_garbage
-  other.garbage_q = source.garbage_q
+  other.later_garbage = deepcpy(source.later_garbage)
+  other.garbage_q = source.garbage_q:makeCopy()
   if source.telegraph then
     other.telegraph = source.telegraph:rollbackCopy(source.telegraph, other.telegraph)
   end
@@ -342,8 +351,6 @@ function Stack.rollbackCopy(self, source, other)
   other.countdown_cursor_state = source.countdown_cursor_state
   other.countdown_cur_speed = source.countdown_cur_speed
   other.countdown_timer = source.countdown_timer
-
-
   other.CLOCK = source.CLOCK
   other.game_stopwatch = source.game_stopwatch
   other.game_stopwatch_running = source.game_stopwatch_running
@@ -399,14 +406,86 @@ function Stack.restoreFromRollbackCopy(self, other)
 end
 
 function Stack.rollbackToFrame(self, frame) 
-  local difference = self.CLOCK - frame
-  assert(difference <= MAX_LAG, "Lag is too high > 1.5 seconds")
-  if frame < self.CLOCK then
+  local currentFrame = self.CLOCK
+  local difference = currentFrame - frame
+  assert(difference <= MAX_LAG, "Latency is too high :(")
+  if frame < currentFrame then
     local prev_states = self.prev_states
-    print("Rolling back " .. self.which .. " to " .. frame)
+    logger.debug("Rolling back " .. self.which .. " to " .. frame)
     assert(prev_states[frame])
     self:restoreFromRollbackCopy(prev_states[frame])
+
+    if self.garbage_target and self.garbage_target.telegraph then
+      -- The garbage that we send this time might (rarely) not be the same
+      -- as the garbage we sent before.  Wipe out the garbage we sent before...
+      for k, v in pairs(self.garbage_target.telegraph.pendingGarbage) do
+        if k >= frame then
+          self.garbage_target.telegraph.pendingGarbage[k] = nil
+        end
+      end
+
+      for k, v in pairs(self.garbage_target.telegraph.pendingChainingEnded) do
+        if k >= frame then
+          self.garbage_target.telegraph.pendingChainingEnded[k] = nil
+        end
+      end
+    end
+
+    self.rollbackCount = self.rollbackCount + 1
+    self.lastRollbackFrame = currentFrame
   end
+end
+
+function Stack.debugRollbackTest(self)
+  local targetFrame = self.CLOCK
+
+  if self.garbage_target and self.garbage_target.CLOCK ~= targetFrame then
+    return
+  end
+
+  local savedStack = self.prev_states[self.CLOCK]
+  
+  self:rollbackToFrame(self.CLOCK - 1)
+
+  if self.garbage_target and self.garbage_target ~= self then
+    self.garbage_target:rollbackToFrame(self.garbage_target.CLOCK - 1)
+  end
+
+  for i=1,1 do
+    self:run()
+    if self.garbage_target and self.garbage_target ~= self then
+      self.garbage_target:run()
+    end
+  end
+
+  assert(self.CLOCK == targetFrame, "should have got back to target frame")
+  if self.garbage_target and self.garbage_target ~= self then
+    assert(self.garbage_target.CLOCK == targetFrame, "should have got back to target frame")
+  end
+
+  local diverged = false
+  for k,v in pairs(savedStack) do
+    if type(v) ~= "table" then
+      local v2 = self[k]
+      if v ~= v2 then
+        diverged = true
+      end
+    end
+  end
+
+  local savedStackString = self:divergenceString(savedStack)
+  local localStackString = self:divergenceString(self)
+
+  if savedStackString ~= localStackString then
+    diverged = true
+  end
+
+  if diverged then
+    logger.error("Stacks have diverged")
+    self:rollbackToFrame(targetFrame-1)
+    self:run()
+  end
+
 end
 
 -- Saves state in backups in case its needed for rollback
@@ -420,33 +499,6 @@ function Stack.saveForRollback(self)
   prev_states[self.CLOCK] = self:rollbackCopy(self)
   self.prev_states = prev_states
   self.garbage_target = garbage_target
-    
-  --   if config.debug_mode then -- Don't need to save, but lets check for divergence
-  --   local savedStack = prev_states[self.CLOCK]
-
-  --   local diverged = false
-  --   for k,v in pairs(savedStack) do
-  --     if type(v) ~= "table" then
-  --       local v2 = self[k]
-  --       if v ~= v2 then
-  --         diverged = true
-  --       end
-  --     end
-  --   end
-
-  --   local savedStackString = self:divergenceString(savedStack)
-  --   local localStackString = self:divergenceString(self)
-
-  --   if savedStackString ~= localStackString then
-  --     diverged = true
-  --   end
-
-  --   if diverged then
-  --     print("Stacks have diverged")
-  --     self:rollbackToFrame(self.CLOCK-1)
-  --     self:run()
-  --   end
-  -- end
 
   local deleteFrame = self.CLOCK - MAX_LAG - 1
   if prev_states[deleteFrame] then
@@ -555,14 +607,11 @@ function GarbageQueue.push(self, garbage)
     for k,v in pairs(garbage) do
       local width, height, metal, from_chain, finalized = unpack(v)
       if width and height then
-        --print("GarbageQueue.push")
-        --print("frame_earned: "..v.frame_earned)
         if metal then
           self.metal:push(v)
         elseif from_chain or height > 1 then
           if not from_chain then
             error("ERROR: garbage with height > 1 was not marked as 'from_chain'")
-            logger.warn("adding it to the chain garbage queue anyway")
           end
           self.chain_garbage:push(v)
           self.ghost_chain = nil
@@ -571,8 +620,6 @@ function GarbageQueue.push(self, garbage)
         end
       end
     end
-    --print("after push, the queue is:")
-    --print(self:to_string())
   end
 end
 
@@ -604,7 +651,6 @@ function GarbageQueue.pop(self, just_peeking)
   --check for any metal garbage, and return one if any
   if self.metal:peek() then
     if not just_peeking then
-      print("popping metal garbage from the queue")
       return self.metal:pop()
     else
       return self.metal:peek()
@@ -655,22 +701,11 @@ end
 -- or add a 6-wide if there is not chain garbage yet in the queue
 function GarbageQueue.grow_chain(self,frame_earned, newChain)
   local result = nil
-  --print("in GarbageQueue.grow_chain")
-  --print("frame_earned: "..(frame_earned or "nil"))
-  --print("json.encode(self.sender.chains):")
-  --print(json.encode(self.sender.chains))
+
   if newChain then
     result = {{6,1,false,true, frame_earned=frame_earned, finalized=false}}
     self:push(result) --a garbage block 6-wide, 1-tall, not metal, from_chain
   else 
-    --print("in GarbageQueue.grow_chain")
-    --print("self.sender.CLOCK:")
-    --print(self.sender.CLOCK)
-    --print("self.stack.chain_counter = "..(self.stack.chain_counter or "nil"))
-    --print("self.chain_garbage:len() = "..self.chain_garbage:len())
-    --print(self:to_string())
-    --print("table_to_string(self.chain_garbage):")
-    --print(table_to_string(self.chain_garbage))
     result = self.chain_garbage[self.chain_garbage.first]
     result[2]--[[height]] = result[2]--[[height]] + 1
     result.frame_earned = frame_earned
@@ -921,8 +956,7 @@ end
 
 function Stack.shouldRun(self, runsSoFar) 
 
-  -- If we are a replay or net game, we want to run after game over to show
-  -- game over effects.
+  -- We want to run after game over to show game over effects.
   if self:game_ended() then
     return runsSoFar == 0
   end
@@ -952,7 +986,7 @@ function Stack.shouldRun(self, runsSoFar)
   return false
 end
 
--- Update everything for the stack based on inputs. Will update many times if needed to catch up.
+-- Runs one step of the stack.
 function Stack.run(self)
   if GAME.gameIsPaused then
     return
@@ -991,7 +1025,7 @@ end
 function Stack.receiveConfirmedInput(self, input)
   self.confirmedInput = self.confirmedInput .. input
   self.input_buffer = self.input_buffer .. input
-  --print("Player " .. self.which .. " got new input. Total length: " .. string.len(self.confirmedInput))
+  --logger.debug("Player " .. self.which .. " got new input. Total length: " .. string.len(self.confirmedInput))
 end
 
 -- Enqueue a card animation
@@ -1342,10 +1376,12 @@ function Stack.simulate(self)
             end
             if panel.shake_time and panel.state == "normal" then
               if row <= self.height then
-                if panel.height > 3 then
-                  self.sfx_garbage_thud = 3
-                else
-                  self.sfx_garbage_thud = panel.height
+                if self:shouldChangeSoundEffects() then
+                  if panel.height > 3 then
+                    self.sfx_garbage_thud = 3
+                  else
+                    self.sfx_garbage_thud = panel.height
+                  end
                 end
                 shake_time = max(shake_time, panel.shake_time, self.peak_shake_time or 0)
                 --a smaller garbage block landing should renew the largest of the previous blocks' shake times since our shake time was last zero.
@@ -1372,7 +1408,9 @@ function Stack.simulate(self)
             -- unless the panel below is falling.
             panel.state = "landing"
             panel.timer = 12
-            self.sfx_land = true
+            if self:shouldChangeSoundEffects() then
+              self.sfx_land = true
+            end
           elseif panels[row - 1][col].color ~= 0 and panels[row - 1][col].state ~= "falling" then
             -- if it lands on a hovering panel, it inherits
             -- that panel's hover time.
@@ -1383,7 +1421,9 @@ function Stack.simulate(self)
               panel.state = "landing"
               panel.timer = 12
             end
-            self.sfx_land = true
+            if self:shouldChangeSoundEffects() then
+              self.sfx_land = true
+            end
           else
             panels[row - 1][col], panels[row][col] = panels[row][col], panels[row - 1][col]
             panels[row][col]:clear()
@@ -1452,7 +1492,7 @@ function Stack.simulate(self)
               panel.state = "popping"
               panel.timer = panel.combo_index * self.FRAMECOUNT_POP
             elseif panel.state == "popping" then
-              --print("POP")
+              --logger.debug("POP")
               if (panel.combo_size > 6) or self.chain_counter > 1 then
                 popsize = "normal"
               end
@@ -1551,13 +1591,13 @@ function Stack.simulate(self)
     -- Actions performed according to player input
 
     -- CURSOR MOVEMENT
-    self.move_sound = true
+    local playMoveSounds = true -- set this to false to disable move sounds for debugging
     if self.cur_dir and (self.cur_timer == 0 or self.cur_timer == self.cur_wait_time) and not self.cursor_lock then
       local prev_row = self.cur_row
       local prev_col = self.cur_col
       self.cur_row = bound(1, self.cur_row + d_row[self.cur_dir], self.top_cur_row)
       self.cur_col = bound(1, self.cur_col + d_col[self.cur_dir], width - 1)
-      if (self.move_sound and (self.cur_timer == 0 or self.cur_timer == self.cur_wait_time) and (self.cur_row ~= prev_row or self.cur_col ~= prev_col)) then
+      if (playMoveSounds and (self.cur_timer == 0 or self.cur_timer == self.cur_wait_time) and (self.cur_row ~= prev_row or self.cur_col ~= prev_col)) then
         if self:shouldChangeSoundEffects() then
           SFX_Cur_Move_Play = 1
         end
@@ -1688,23 +1728,24 @@ function Stack.simulate(self)
         self.panels_in_top_row = true
       end
     end
-    local garbage_fits_in_populated_top_row 
 
-    if self.garbage_q:len() > 0 then
-      --even if there are some panels in the top row,
-      --check if the next block in the garbage_q would fit anyway
-      --ie. 3-wide garbage might fit if there are three empty spaces where it would spawn
-      garbage_fits_in_populated_top_row = true
-      local next_garbage_block_width, next_garbage_block_height, _metal, from_chain = unpack(self.garbage_q:peek())
-      local cols = self.garbage_cols[next_garbage_block_width]
-      local spawn_col = cols[cols.idx]
-      local spawn_row = #self.panels
-      for idx=spawn_col, spawn_col+next_garbage_block_width-1 do
-        if prow[idx]:dangerous() then 
-          garbage_fits_in_populated_top_row = nil
-        end
-      end
-    end
+    -- local garbage_fits_in_populated_top_row 
+    -- if self.garbage_q:len() > 0 then
+    --   --even if there are some panels in the top row,
+    --   --check if the next block in the garbage_q would fit anyway
+    --   --ie. 3-wide garbage might fit if there are three empty spaces where it would spawn
+    --   garbage_fits_in_populated_top_row = true
+    --   local next_garbage_block_width, next_garbage_block_height, _metal, from_chain = unpack(self.garbage_q:peek())
+    --   local cols = self.garbage_cols[next_garbage_block_width]
+    --   local spawn_col = cols[cols.idx]
+    --   local spawn_row = #self.panels
+    --   for idx=spawn_col, spawn_col+next_garbage_block_width-1 do
+    --     if prow[idx]:dangerous() then 
+    --       garbage_fits_in_populated_top_row = nil
+    --     end
+    --   end
+    -- end
+    
     -- If any panels (dangerous or not) are in rows above the top row, garbage should not fall.
     for row_idx = top_row + 1, #self.panels do
       for col_idx = 1, width do
@@ -1759,8 +1800,6 @@ function Stack.simulate(self)
         else
           -- no music loaded
         end
-        musics_to_use = stages[current_stage].musics
-
 
         local wantsDangerMusic = self.danger_music
         if self.garbage_target and self.garbage_target.danger_music then
@@ -1945,31 +1984,24 @@ function Stack.simulate(self)
   self:update_cards()
 end
 
-function Stack.shouldChangeMusic(self)
-  local result = not game_is_paused and self.which == 1 and not GAME.preventSounds
-
-  if result then
-    if self:game_ended() or self.canvas == nil then
-      result = false
-    end
-
-    if P1.play_to_end then
-      result = false
-    end
-
-    if P2 and P2.play_to_end then
-      result = false
-    end
+function Stack.behindRollback(self)
+  if self.lastRollbackFrame > self.CLOCK then
+    return true
   end
 
-  return result
+  return false
 end
 
-function Stack.shouldChangeSoundEffects(self)
-  local result = not game_is_paused and not SFX_mute and not GAME.preventSounds
+function Stack.shouldChangeMusic(self)
+  local result = not GAME.gameIsPaused and not GAME.preventSounds
 
   if result then
     if self:game_ended() or self.canvas == nil then
+      result = false
+    end
+
+    -- If we are still catching up from rollback don't play sounds again
+    if self:behindRollback() then
       result = false
     end
 
@@ -1977,7 +2009,17 @@ function Stack.shouldChangeSoundEffects(self)
       result = false
     end
 
+    if self.garbage_target and self.garbage_target.play_to_end then
+      result = false
+    end
   end
+
+  return result
+end
+
+
+function Stack.shouldChangeSoundEffects(self)
+  local result = self:shouldChangeMusic() and not SFX_mute
 
   return result
 end
@@ -2195,7 +2237,7 @@ end
 -- drops a width x height garbage.
 function Stack.drop_garbage(self, width, height, metal)
 
-  print("dropping garbage at frame "..self.CLOCK)
+  logger.debug("dropping garbage at frame "..self.CLOCK)
   local spawn_row = self.height + 1
 
   -- Do one last check for panels in the way.
@@ -2385,9 +2427,9 @@ function Stack.check_matches(self)
         if panel.y_offset == -1 then
           if gpan_row == nil then
             if string.len(self.gpanel_buffer) <= 10 * self.width then
-              local garbagePanels = makeGarbagePanels(self.seed + self.garbageGenCount, self.NCOLORS, self.gpanel_buffer)
+              local garbagePanels = makeGarbagePanels(self.match.seed + self.garbageGenCount, self.NCOLORS, self.gpanel_buffer)
               self.gpanel_buffer = self.gpanel_buffer .. garbagePanels
-              logger.info("Generating garbage with seed: " .. self.seed + self.garbageGenCount .. " buffer: " .. self.gpanel_buffer)
+              logger.info("Generating garbage with seed: " .. self.match.seed + self.garbageGenCount .. " buffer: " .. self.gpanel_buffer)
               self.garbageGenCount = self.garbageGenCount + 1
             end
             gpan_row = string.sub(self.gpanel_buffer, 1, 6)
@@ -2448,7 +2490,7 @@ function Stack.check_matches(self)
   if (combo_size ~= 0) then
     self.combos[self.CLOCK] = combo_size
     if self.garbage_target and self.garbage_target.telegraph and metal_count == 3 and combo_size == 3 then
-      self.garbage_target.telegraph:push("combo", combo_size, metal_count,first_panel_col, first_panel_row, self.CLOCK)
+      self.garbage_target.telegraph:push("combo", combo_size, metal_count, first_panel_col, first_panel_row, self.CLOCK)
     end
     self.analytic:register_destroyed_panels(combo_size)
     if (combo_size > 3) then
@@ -2467,7 +2509,7 @@ function Stack.check_matches(self)
 
       self:enqueue_card(false, first_panel_col, first_panel_row, combo_size)
       if self.garbage_target and self.garbage_target.telegraph then
-        self.garbage_target.telegraph:push("combo", combo_size, metal_count,first_panel_col, first_panel_row, self.CLOCK)
+        self.garbage_target.telegraph:push("combo", combo_size, metal_count, first_panel_col, first_panel_row, self.CLOCK)
       end
       --EnqueueConfetti(first_panel_col<<4+P1StackPosX+4,
       --          first_panel_row<<4+P1StackPosY+self.displacement-9);
@@ -2613,8 +2655,8 @@ function Stack.new_row(self)
   end
 
   if string.len(self.panel_buffer) <= 10 * self.width then
-    self.panel_buffer = self.panel_buffer .. make_panels(self.seed + self.panelGenCount, self.NCOLORS, self.panel_buffer, self)
-    logger.info("generating panels with seed: " .. self.seed + self.panelGenCount .. " buffer: " .. self.panel_buffer)
+    self.panel_buffer = self.panel_buffer .. make_panels(self.match.seed + self.panelGenCount, self.NCOLORS, self.panel_buffer, self)
+    logger.info("generating panels with seed: " .. self.match.seed + self.panelGenCount .. " buffer: " .. self.panel_buffer)
     self.panelGenCount = self.panelGenCount + 1
   end
 
@@ -2653,22 +2695,3 @@ function Stack.new_row(self)
   self.panel_buffer = string.sub(self.panel_buffer, 7)
   self.displacement = 16
 end
-
---[[function quiet_cursor_movement()
-  if self.cur_timer == 0 then
-    return
-  end
-   -- the cursor will move if a direction's was just pressed or has been
-   -- pressed for at least the self.cur_wait_time
-  self.move_sound = true
-  if self.cur_dir and (self.cur_timer == 1 or
-    self.cur_timer == self.cur_wait_time) then
-    self.cur_row = bound(0, self.cur_row + d_row[self.cur_dir],
-            self.bottom_row)
-    self.cur_col = bound(0, self.cur_col + d_col[self.cur_dir],
-            self.width - 2)
-  end
-  if self.cur_timer ~= self.cur_wait_time then
-    self.cur_timer = self.cur_timer + 1
-  end
-end--]]

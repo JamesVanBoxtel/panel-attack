@@ -242,6 +242,8 @@ function select_screen.main()
     end
 
     if msg.replay_of_match_so_far then
+      msg.replay_of_match_so_far.vs.I = uncompress_input_string(msg.replay_of_match_so_far.vs.I)
+      msg.replay_of_match_so_far.vs.in_buf = uncompress_input_string(msg.replay_of_match_so_far.vs.in_buf)
       replay_of_match_so_far = msg.replay_of_match_so_far
     end
 
@@ -888,6 +890,19 @@ function select_screen.main()
           character_loader_wait()
           stage_loader_wait()
           GAME.match = Match("vs", GAME.battleRoom)
+
+          -- Use the seed the server gives us if it makes one, else generate a basic one off data both clients have.
+          local seed
+          if msg.seed or (replay_of_match_so_far and replay_of_match_so_far.vs and replay_of_match_so_far.vs.seed) then
+            seed = msg.seed or (replay_of_match_so_far and replay_of_match_so_far.vs and replay_of_match_so_far.vs.seed)
+          else 
+            seed = 17
+            seed = seed * 37 + global_current_room_ratings[1].new;
+            seed = seed * 37 + global_current_room_ratings[2].new;
+            seed = seed * 37 + GAME.battleRoom.playerWinCounts[1];
+            seed = seed * 37 + GAME.battleRoom.playerWinCounts[2];
+          end
+          GAME.match.seed = seed
           local is_local = true
           if GAME.battleRoom.spectating then
             is_local = false
@@ -907,7 +922,7 @@ function select_screen.main()
           P1:set_garbage_target(P2)
           P2:set_garbage_target(P1)
           P2:moveForPlayerNumber(2)
-          replay = createNewReplay(GAME.match.mode)
+          replay = createNewReplay(GAME.match)
           
           if GAME.battleRoom.spectating and replay_of_match_so_far then --we joined a match in progress
             for k, v in pairs(replay_of_match_so_far.vs) do

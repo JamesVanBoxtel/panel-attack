@@ -15,17 +15,20 @@ Match =
     self.supportsPause = true
     self.attackEngine = nil
     self.current_music_is_casual = true 
+    self.seed = math.random(1,9999999)
+    self.isFromReplay = false
   end
 )
 
-function Match.gameEndedClockTime()
+function Match:gameEndedClockTime()
 
-  local result = P1.game_over_clock
+  local result = self.P1.game_over_clock
   
-  if P2 then
-    if P2.game_over_clock > 0 then
-      if result == 0 or P2.game_over_clock < result then
-        result = P2.game_over_clock
+  if self.P1.garbage_target and self.P1.garbage_target ~= self then
+    local otherPlayer = self.P1.garbage_target
+    if otherPlayer.game_over_clock > 0 then
+      if result == 0 or otherPlayer.game_over_clock < result then
+        result = otherPlayer.game_over_clock
       end
     end
   end
@@ -64,13 +67,22 @@ function Match.matchOutcome(self)
   return results
 end
 
-
 function Match.run(self)
+  local P1 = self.P1
+  local P2 = self.P2
+
   if GAME.gameIsPaused then
     return
   end
 
   local startTime = love.timer.getTime()
+
+  if config.debug_mode and network_connected() == false then
+    local rollbackStart = 100
+    if P1 and P1:game_ended() == false and P1:behindRollback() == false and P1.CLOCK > rollbackStart then
+      P1:debugRollbackTest()
+    end
+  end
 
   -- We need to save CLOCK 0 as a base case
   if P1.CLOCK == 0 then  
@@ -108,6 +120,7 @@ function Match.run(self)
       self.attackEngine:run()
     end
 
+    -- Since the stacks can affect each other, don't save rollback until after both have run
     if ranP1 then
       P1:saveForRollback()
     end
@@ -131,20 +144,6 @@ function Match.run(self)
   self.timeSpentRunning = self.timeSpentRunning + timeDifference
 end
 
-function Match.framesToSimulate(self) 
-  local framesToSimulate = 1
-
-  if P1:game_ended() == false then
-    local maxConfirmedFrame = string.len(P1.confirmedInput)
-    if P2 and string.len(P2.confirmedInput) > maxConfirmedFrame then
-      maxConfirmedFrame = string.len(P2.confirmedInput)
-    end
-    framesToSimulate = maxConfirmedFrame - P1.CLOCK
-  end
-
-  return framesToSimulate
-end
-
 local P1_win_quads = {}
 local P1_rating_quads = {}
 
@@ -152,7 +151,9 @@ local P2_rating_quads = {}
 local P2_win_quads = {}
 
 function Match.render(self)
-
+  local P1 = self.P1
+  local P2 = self.P2
+  
   if GAME.droppedFrames > 10 and config.show_fps then
     gprint("Dropped Frames: " .. GAME.droppedFrames, 1, 12)
   end
@@ -213,14 +214,17 @@ function Match.render(self)
 
     grectangle_color("fill", (drawX - 5) / GFX_SCALE, (drawY - 5) / GFX_SCALE, 1000/GFX_SCALE, 100/GFX_SCALE, 0, 0, 0, 0.5)
     
-    gprintf("P1 Clock " .. P1.CLOCK, drawX, drawY)
+    gprintf("Clock " .. P1.CLOCK, drawX, drawY)
 
 
     drawY = drawY + padding
-    gprintf("P1 Confirmed " .. string.len(P1.confirmedInput) , drawX, drawY)
+    gprintf("Confirmed " .. string.len(P1.confirmedInput) , drawX, drawY)
 
     drawY = drawY + padding
-    gprintf("P1 input_buffer " .. string.len(P1.input_buffer) , drawX, drawY)
+    gprintf("input_buffer " .. string.len(P1.input_buffer) , drawX, drawY)
+
+    drawY = drawY + padding
+    gprintf("rollbackCount " .. P1.rollbackCount , drawX, drawY)
 
     -- drawY = drawY + padding
     -- gprintf("P1 Panels: " .. P1.panel_buffer, drawX, drawY)
@@ -239,11 +243,11 @@ function Match.render(self)
 
     if P1.game_over_clock > 0 then
       drawY = drawY + padding
-      gprintf("P1 game_over_clock " .. P1.game_over_clock, drawX, drawY)
+      gprintf("game_over_clock " .. P1.game_over_clock, drawX, drawY)
     end
 
     drawY = drawY + padding
-    gprintf("P1 chain panels " .. P1.n_chain_panels, drawX, drawY)
+    gprintf("chain panels " .. P1.n_chain_panels, drawX, drawY)
 
     -- if P1.telegraph then
     --   drawY = drawY + padding
@@ -271,6 +275,9 @@ function Match.render(self)
     local timePercent = self.timeSpentRunning / totalTime
     gprintf("Time Percent Running Match: " .. timePercent, drawX, drawY)
 
+    drawY = drawY + padding
+    gprintf("Seed " .. GAME.match.seed, drawX, drawY)
+
     local gameEndedClockTime = self:gameEndedClockTime()
 
     if gameEndedClockTime > 0 then
@@ -283,21 +290,24 @@ function Match.render(self)
       drawY = 10 - padding
 
       drawY = drawY + padding
-      gprintf("P2 Clock " .. P2.CLOCK, drawX, drawY)
+      gprintf("Clock " .. P2.CLOCK, drawX, drawY)
 
       drawY = drawY + padding
       local framesAhead = string.len(P1.confirmedInput) - string.len(P2.confirmedInput)
       gprintf("Ahead: " .. framesAhead, drawX, drawY)
 
       drawY = drawY + padding
-      gprintf("P2 Confirmed " .. string.len(P2.confirmedInput) , drawX, drawY)
+      gprintf("Confirmed " .. string.len(P2.confirmedInput) , drawX, drawY)
 
       drawY = drawY + padding
-      gprintf("P2 input_buffer " .. string.len(P2.input_buffer) , drawX, drawY)
+      gprintf("input_buffer " .. string.len(P2.input_buffer) , drawX, drawY)
+
+      drawY = drawY + padding
+      gprintf("rollbackCount " .. P2.rollbackCount , drawX, drawY)
 
       if P2.game_over_clock > 0 then
         drawY = drawY + padding
-        gprintf("P2 game_over_clock " .. P2.game_over_clock, drawX, drawY)
+        gprintf("game_over_clock " .. P2.game_over_clock, drawX, drawY)
       end
 
       -- if P2.telegraph then

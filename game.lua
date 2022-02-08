@@ -14,6 +14,7 @@ Game =
     self.gameIsPaused = false -- game can be paused while playing on local
     self.renderDuringPause = false -- if the game can render when you are paused
     self.TASMode = true
+    self.currently_paused_tracks = {} -- list of tracks currently paused
   end
 )
 
@@ -21,6 +22,7 @@ function Game.clearMatch(self)
   self.match = nil
   self.gameIsPaused = false
   self.renderDuringPause = false
+  self.currently_paused_tracks = {}
   P1 = nil
   P2 = nil
 end

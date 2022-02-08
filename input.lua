@@ -21,26 +21,6 @@ Input =
 
 local input = Input()
 
--- The class that holds all input mappings and state
--- TODO: move all state variables in here
-Input =
-  class(
-  function(self)
-    self.inputConfigurations = {} -- a table of all valid input configurations, each configuration is a map of input type to the mapped key
-    self.maxConfigurations = 8
-    for i = 1, self.maxConfigurations do
-      self.inputConfigurations[#self.inputConfigurations+1] = {}
-    end
-    self.inputConfigurations[1] = {up="up", down="down", left="left", right="right", swap1="z", swap2="x", taunt_up="y", taunt_down="u", raise1="c", raise2="v", pause="p"}
-    self.playerInputConfigurationsMap = {} -- playerNumber -> table of all inputConfigurations assigned to that player
-    self.acceptingPlayerInputConfigurationAssignments = false -- If true the next inputs that come in will assign to the next player that doesn't have assignments
-    self.availableInputConfigurationsToAssign = nil -- the list of available input configurations to assign, only valid while acceptingPlayerInputConfigurationAssignments is set
-    self.numberOfPlayersAcceptingInputConfiguration = 0 -- the number of players we want assigned input configurations, only valid while acceptingPlayerInputConfigurationAssignments is set
-  end
-)
-
-local input = Input()
-
 local jpexists, jpname, jrname
 for k, v in pairs(love.handlers) do
   if k == "jp" then
@@ -525,6 +505,16 @@ menu_pause =
   function()
     return themes[config.theme].sounds.menu_validate
   end
+)
+menu_return_once =
+  input_key_func(
+  {"return", "kenter"},
+  {},
+  released_key_before_time,
+  function()
+    return themes[config.theme].sounds.menu_validate
+  end,
+  super_selection_duration
 )
 menu_advance_frame =
   input_key_func(

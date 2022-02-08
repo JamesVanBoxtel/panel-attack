@@ -261,12 +261,15 @@ local function commonGameSetup()
   pick_use_music_from()
 end
 
-function createNewReplay(mode)
+function createNewReplay(match)
+  local mode = match.mode
   local result = {}
   result.engineVersion = VERSION
 
   result[mode] = {}
   local modeReplay = result[mode]
+
+  modeReplay.seed = match.seed
 
   if mode == "endless" or mode == "time" then
     modeReplay.do_countdown = P1.do_countdown or false
@@ -312,7 +315,6 @@ local function handle_pause(self)
           reset_filters()
         else
           use_current_stage()
-          leftover_time = 1 / 120 -- prevents any left over time from getting big after a pause
         end
       end
     end
@@ -439,7 +441,7 @@ local function main_endless_time_setup(mode, speed, difficulty)
   P1.do_countdown = config.ready_countdown_1P or false
   P2 = nil
 
-  replay = createNewReplay(mode)
+  replay = createNewReplay(GAME.match)
 
   P1:starting_state()
 
@@ -1177,7 +1179,7 @@ function main_local_vs()
 
   commonGameSetup()
 
-  replay = createNewReplay(GAME.match.mode)
+  replay = createNewReplay(GAME.match)
   
   local function update() 
     assert((P1.CLOCK == P2.CLOCK), "should run at same speed: " .. P1.CLOCK .. " - " .. P2.CLOCK)
@@ -1229,7 +1231,7 @@ function main_local_vs_yourself()
 
   commonGameSetup()
 
-  replay = createNewReplay(GAME.match.mode)
+  replay = createNewReplay(GAME.match)
   
   local function update() 
 
@@ -1262,6 +1264,8 @@ function loadFromReplay(replay)
 
     GAME.battleRoom = BattleRoom()
     GAME.match = Match("vs", GAME.battleRoom)
+    GAME.match.seed = replay.seed or 0
+    GAME.match.isFromReplay = true
     P1 = Stack(1, GAME.match, false, config.panels, replay.P1_level or 5)
     P1.character = replay.P1_char
 
@@ -1300,9 +1304,11 @@ function loadFromReplay(replay)
     else
       GAME.match = Match("endless")
     end
-
+    
     replay = replay.endless or replay.time
 
+    GAME.match.seed = replay.seed or 0
+    
     if replay.pan_buf then
       replay.P = replay.pan_buf -- support old versions
     end
@@ -1541,7 +1547,7 @@ function main_set_name()
         if this_frame_keys["escape"] then
           ret = {main_select_mode}
         end
-        if menu_enter() then
+        if menu_return_once() then
           config.name = name
           write_conf_file()
           ret = {main_select_mode}
