@@ -437,7 +437,9 @@ local function main_endless_time_setup(mode, speed, difficulty)
 
   commonGameSetup()
 
-  P1 = Stack(1, GAME.match, true, config.panels, speed, difficulty)
+  --P1 = Stack{which=1, match=GAME.match, is_local=true, panels_dir=config.panels, speed=speed, difficulty=difficulty, character=config.character}
+  P1 = Stack{which=1, match=GAME.match, is_local=true, panels_dir=config.panels, level=8, character=config.character}
+
   GAME.match.P1 = P1
   P1:wait_for_random_character()
   P1.do_countdown = config.ready_countdown_1P or false
@@ -469,16 +471,18 @@ local function main_endless_time_setup(mode, speed, difficulty)
   local function processGameResults(gameResult) 
     local extraPath, extraFilename
     local stack = P1
-    if GAME.match.mode == "endless" then
-      GAME.scores:saveEndlessScoreForLevel(P1.score, P1.difficulty)
-      extraPath = "Endless"
-      extraFilename = "Spd" .. stack.speed .. "-Dif" .. stack.difficulty .. "-endless"
-    elseif GAME.match.mode == "time" then
-      GAME.scores:saveTimeAttack1PScoreForLevel(P1.score, P1.difficulty)
-      extraPath = "Time Attack"
-      extraFilename = "Spd" .. stack.speed .. "-Dif" .. stack.difficulty .. "-timeattack"
+    if stack.level == nil then
+      if GAME.match.mode == "endless" then
+        GAME.scores:saveEndlessScoreForLevel(P1.score, P1.difficulty)
+        extraPath = "Endless"
+        extraFilename = "Spd" .. stack.speed .. "-Dif" .. stack.difficulty .. "-endless"
+      elseif GAME.match.mode == "time" then
+        GAME.scores:saveTimeAttack1PScoreForLevel(P1.score, P1.difficulty)
+        extraPath = "Time Attack"
+        extraFilename = "Spd" .. stack.speed .. "-Dif" .. stack.difficulty .. "-timeattack"
+      end
+      finalizeAndWriteReplay(extraPath, extraFilename)
     end
-    finalizeAndWriteReplay(extraPath, extraFilename)
 
     return {game_over_transition, {nextFunction, nil, P1:pick_win_sfx()}}
   end
@@ -1266,17 +1270,14 @@ function loadFromReplay(replay)
 
     GAME.battleRoom = BattleRoom()
     GAME.match = Match("vs", GAME.battleRoom)
-    P1 = Stack(1, GAME.match, false, config.panels, replay.P1_level or 5)
-    P1.character = replay.P1_char
+    P1 = Stack{which=1, match=GAME.match, is_local=false, level=replay.P1_level or 5, character=replay.P1_char}
 
     if replay.O and string.len(replay.O) > 0 then
-      P2 = Stack(2, GAME.match, false, config.panels, replay.P2_level or 5)
+      P2 = Stack{which=2, match=GAME.match, is_local=false, level=replay.P2_level or 5, character=replay.P2_char}
       
       P1.garbage_target = P2
       P2.garbage_target = P1
       P2:moveForPlayerNumber(2)
-
-      P2.character = replay.P2_char
 
       if replay.P1_win_count then
         GAME.match.battleRoom.playerWinCounts[1] = replay.P1_win_count
@@ -1311,7 +1312,7 @@ function loadFromReplay(replay)
       replay.P = replay.pan_buf -- support old versions
     end
 
-    P1 = Stack(1, GAME.match, false, config.panels, replay.speed, replay.difficulty)
+    P1 = Stack{which=1, match=GAME.match, is_local=false, speed=replay.speed, difficulty=replay.difficulty}
     GAME.match.P1 = P1
     P1:wait_for_random_character()
   end
@@ -1430,7 +1431,7 @@ function make_main_puzzle(puzzleSet, awesome_idx)
     commonGameSetup()
 
     GAME.match = Match("puzzle")
-    P1 = Stack(1, GAME.match, true, config.panels)
+    P1 = Stack{which=1, match=GAME.match, is_local=false}
     GAME.match.P1 = P1
     P1:wait_for_random_character()
     P1.do_countdown = config.ready_countdown_1P or false
