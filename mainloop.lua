@@ -79,6 +79,7 @@ function fmainloop()
     require("ServerQueueTests")
     require("StackTests")
     require("table_util_tests")
+    require("GlickoTests")
   end
 
   while true do
