@@ -107,7 +107,8 @@ Stack =
     s.game_stopwatch = 0
     s.game_stopwatch_running = false
     s.do_countdown = true
-    s.max_runs_per_frame = 3
+    s.max_runs_per_frame = 2
+    s.framesToBuffer = 2
 
     s.displacement = 16
     -- This variable indicates how far below the top of the play
@@ -754,17 +755,20 @@ function Stack.shouldRun(self, runsSoFar)
   end
 
   -- If we are not local, we want to run faster to catch up.
-  if buffer_len >= 15 - runsSoFar then
-    -- way behind, run at max speed.
-    return runsSoFar < self.max_runs_per_frame
-  elseif buffer_len >= 10 - runsSoFar then
+  if buffer_len + runsSoFar >= self.framesToBuffer then
     -- When we're closer, run fewer times per frame, so things are less choppy.
     -- This might have a side effect of taking a little longer to catch up
     -- since we don't always run at top speed.
     local maxRuns = math.min(2, self.max_runs_per_frame)
     return runsSoFar < maxRuns
-  elseif buffer_len >= 1 then
+  elseif buffer_len + runsSoFar >= 1 then
+    if self.CLOCK % 60 == 1 then
+      self.framesToBuffer = math.max(self.framesToBuffer - 1, 2)
+    end
     return runsSoFar == 0
+  else
+    -- We are waiting on input, so we probably should have buffered more.
+    self.framesToBuffer = self.framesToBuffer + 1
   end
 
   return false
