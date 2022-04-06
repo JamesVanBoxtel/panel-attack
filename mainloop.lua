@@ -105,7 +105,7 @@ function variable_step(f)
       this_frame_unicodes = {}
 
       leftover_time = leftover_time - 1 / 60
-      if leftover_time >= 1 / 60 then
+      if GAME.match and leftover_time >= 1 / 60 then
         GAME.droppedFrames = GAME.droppedFrames + 1
       end
     end

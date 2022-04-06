@@ -81,6 +81,10 @@ function love.update(dt)
     end
   end
 
+  if GAME.match then
+    local average = string.format("%0.4f", round(dt, 4))
+    logger.warn("DT: " .. string.format("%0.4f", round(dt, 4)) .. " leftover before:" .. string.format("%0.4f", round(leftover_time, 4)) .. " total: " .. string.format("%0.4f", round(leftover_time + dt, 4)))
+  end
   leftover_time = leftover_time + dt
 
   local status, err = coroutine.resume(mainloop)
@@ -126,6 +130,9 @@ function love.draw()
   if STONER_MODE then
     gprintf("STONER", 1, 1 + (11 * 4))
   end
+
+
+  logger.warn("drawing queue")
 
   for i = gfx_q.first, gfx_q.last do
     gfx_q[i][1](unpack(gfx_q[i][2]))

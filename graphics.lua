@@ -1,5 +1,6 @@
 require("input")
 require("util")
+local logger = require("logger")
 
 local floor = math.floor
 local ceil = math.ceil
@@ -454,6 +455,7 @@ function Stack.render(self)
 
   -- Draw the cursor
   if self:game_ended() == false then
+    logger.warn("draw cursor")
     self:render_cursor()
   end
 

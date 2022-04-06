@@ -1416,6 +1416,9 @@ function Stack.simulate(self)
     if self.cur_dir and (self.cur_timer == 0 or self.cur_timer == self.cur_wait_time) and not self.cursor_lock then
       local prev_row = self.cur_row
       local prev_col = self.cur_col
+
+      logger.warn("handle input: " .. self.cur_dir)
+
       self.cur_row = bound(1, self.cur_row + d_row[self.cur_dir], self.top_cur_row)
       self.cur_col = bound(1, self.cur_col + d_col[self.cur_dir], width - 1)
       if (playMoveSounds and (self.cur_timer == 0 or self.cur_timer == self.cur_wait_time) and (self.cur_row ~= prev_row or self.cur_col ~= prev_col)) then
@@ -1699,6 +1702,7 @@ function Stack.simulate(self)
         if not (self.match.mode == "vs" and themes[config.theme].sounds.swap:isPlaying()) and not self.do_countdown then
           themes[config.theme].sounds.cur_move:stop()
           themes[config.theme].sounds.cur_move:play()
+          logger.warn("playing move sound")
         end
         SFX_Cur_Move_Play = 0
       end

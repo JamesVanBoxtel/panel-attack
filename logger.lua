@@ -42,12 +42,14 @@ function logger.error(msg)
 end
 
 function direct_log(prefix, msg)
-    local socket_millis = math.floor(socket.gettime()%1 * 1000)
+    local loveTime = string.format("%3.5f", love.timer.getTime())
 
+    local socket_millis = math.floor(socket.gettime()%1 * 1000)
+    local millisecondsString = string.format("%03d", socket_millis) 
     -- Lua date format strings reference: https://www.lua.org/pil/22.1.html
     -- %x - Date
     -- %X - Time
-    print(os.date("%x %X") .. "." .. socket_millis .. " " .. prefix .. ": " .. msg)
+    print(loveTime .. " " .. prefix .. ": " .. msg)
 end
 
 return logger;
