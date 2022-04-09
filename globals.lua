@@ -14,8 +14,6 @@ server_queue = ServerQueue()
 
 score_mode = SCOREMODE_TA
 
-gfx_q = Queue()
-
 themes = {} -- initialized in theme.lua
 
 characters = {} -- initialized in character.lua

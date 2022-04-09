@@ -182,7 +182,6 @@ do
     main_menu:add_button(loc("mm_quit"), exit_game, exit_game)
 
     while true do
-      main_menu:draw()
       if wait_game_update ~= nil then
         has_game_update = wait_game_update:pop()
         if has_game_update ~= nil and has_game_update then
@@ -386,11 +385,7 @@ local function runMainGameLoop(updateFunction, variableStepFunction, abortGameFu
     -- Uncomment this to cripple your game :D
     -- love.timer.sleep(0.030)
 
-    -- don't spend time rendering when catching up to a current spectate match
-    if not (P1 and P1.play_to_end) and not (P2 and P2.play_to_end) then
-      GAME.match:render()
-      wait()
-    end
+    wait()
 
     returnFunction = updateFunction()
     if returnFunction then 
@@ -582,7 +577,6 @@ function training_setup()
   update_width()
 
   while true do
-    trainingSettingsMenu:draw()
     wait()
     variable_step(
       function()
@@ -697,8 +691,6 @@ local function main_select_speed_99(mode)
     draw_pixel_font(lastScore, themes[config.theme].images.IMG_pixelFont_blue_atlas, standard_pixel_font_map(), xPosition1, yPosition + 24, 0.5, 1.0)
     draw_pixel_font("record", themes[config.theme].images.IMG_pixelFont_blue_atlas, standard_pixel_font_map(), xPosition2, yPosition, 0.5, 1.0)
     draw_pixel_font(record, themes[config.theme].images.IMG_pixelFont_blue_atlas, standard_pixel_font_map(), xPosition2, yPosition + 24, 0.5, 1.0)
-
-    gameSettingsMenu:draw()
 
     wait()
     variable_step(
@@ -992,7 +984,6 @@ function main_net_vs_lobby()
         gprint(leaderboard_string, lobby_menu_x[showing_leaderboard] + 400, lobby_menu_y - 120)
       end
       gprint(join_community_msg, main_menu_screen_pos[1] + 30, canvas_height - 50)
-      lobby_menu:draw()
     end
     updated = false
     wait()
@@ -1656,7 +1647,6 @@ function game_over_transition(next_func, text, winnerSFX, timemax)
   end
 
   while true do
-    GAME.match:render()
     gprint(text, (canvas_width - font:getWidth(text)) / 2, 10)
     gprint(button_text, (canvas_width - font:getWidth(button_text)) / 2, 10 + 30)
     wait()

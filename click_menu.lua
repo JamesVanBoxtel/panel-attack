@@ -247,8 +247,14 @@ function Click_menu.update(self)
   end
 end
 
+function Click_menu.drawMenus()
+  for menu_name, menu in pairs(CLICK_MENUS) do
+    menu:draw()
+  end
+end
+
 -- Draws the menu
-function Click_menu.draw(self)
+function Click_menu:draw()
   if self.visible then
     if self.background then
       menu_drawf(self.background, self.x, self.y)

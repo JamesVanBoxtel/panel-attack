@@ -1,3 +1,11 @@
+local launch_type = arg[2]
+if launch_type == "test" or launch_type == "debug" then
+    require "lldebugger"
+    TESTS_ENABLED = 1
+    if launch_type == "debug" then
+        lldebugger.start()
+    end
+end
 require("class")
 socket = require("socket")
 json = require("dkjson")
@@ -55,6 +63,54 @@ end
 function love.focus(f)
   GAME.focused = f
 end
+function love.run()
+	if love.load then love.load(love.arg.parseGameArguments(arg), arg) end
+
+	-- We don't want the first frame's dt to include time taken by love.load.
+	if love.timer then love.timer.step() end
+
+	local dt = 0
+
+	-- Main loop time.
+	return function()
+		-- Process events.
+		if love.event then
+			love.event.pump()
+			for name, a,b,c,d,e,f in love.event.poll() do
+				if name == "quit" then
+					if not love.quit or not love.quit() then
+						return a or 0
+					end
+				end
+				love.handlers[name](a,b,c,d,e,f)
+			end
+		end
+
+		-- Update dt, as we'll be passing it to update
+		if love.timer then dt = love.timer.step() end
+
+		-- Call update and draw
+		if love.update then love.update(dt) end -- will pass 0 if love.timer is disabled
+
+		if love.graphics and love.graphics.isActive() then
+			love.graphics.origin()
+			love.graphics.clear(love.graphics.getBackgroundColor())
+
+			if love.draw then love.draw() end
+      
+      local startTime = love.timer.getTime()
+			love.graphics.present()
+      local endTime = love.timer.getTime()
+
+      local average = string.format("%0.4f", round(endTime - startTime, 4))
+      logger.warn("present: " .. average)
+  
+
+		end
+
+		if love.timer then love.timer.sleep(0.001) end
+	end
+end
 
 -- Called every few fractions of a second to update the game
 -- dt is the amount of time in seconds that has passed.
@@ -78,6 +134,10 @@ function love.update(dt)
     end
   end
 
+  if GAME.match and leftover_time + dt > (1/60.0) then
+    local average = string.format("%0.4f", round(dt, 4))
+    logger.error("DT: " .. string.format("%0.4f", round(dt, 4)) .. " leftover before:" .. string.format("%0.4f", round(leftover_time, 4)) .. " slowness: " .. string.format("%0.4f", round(leftover_time + dt - (1 / 60), 4)))
+  end
   leftover_time = leftover_time + dt
 
   local status, err = coroutine.resume(mainloop)
@@ -99,39 +159,9 @@ end
 
 -- Called whenever the game needs to draw.
 function love.draw()
-  -- if not main_font then
-  -- main_font = love.graphics.newFont("Oswald-Light.ttf", 15)
-  -- end
-  -- main_font:setLineHeight(0.66)
-  -- love.graphics.setFont(main_font)
-  if GAME.foreground_overlay then
-    local scale = canvas_width / math.max(GAME.foreground_overlay:getWidth(), GAME.foreground_overlay:getHeight()) -- keep image ratio
-    menu_drawf(GAME.foreground_overlay, canvas_width / 2, canvas_height / 2, "center", "center", 0, scale, scale)
-  end
 
-  -- Clear the screen
-  love.graphics.setBlendMode("alpha", "alphamultiply")
-  love.graphics.setCanvas(global_canvas)
-  love.graphics.setBackgroundColor(unpack(global_background_color))
-  love.graphics.clear()
-
-  for i = gfx_q.first, gfx_q.last do
-    gfx_q[i][1](unpack(gfx_q[i][2]))
-  end
-  gfx_q:clear()
-
-  -- Draw the FPS if enabled
-  if config ~= nil and config.show_fps then
-    love.graphics.print("FPS: " .. love.timer.getFPS(), 1, 1)
-  end
-
-  love.graphics.setCanvas() -- render everything thats been added
-  love.graphics.clear(love.graphics.getBackgroundColor()) -- clear in preperation for the next render
+  love.graphics.clear(love.graphics.getBackgroundColor())
   
-  x, y, w, h = scale_letterbox(love.graphics.getWidth(), love.graphics.getHeight(), 16, 9)
-  love.graphics.setBlendMode("alpha", "premultiplied")
-  love.graphics.draw(global_canvas, x, y, 0, w / canvas_width, h / canvas_height)
-
   -- draw background and its overlay
   local scale = canvas_width / math.max(GAME.backgroundImage:getWidth(), GAME.backgroundImage:getHeight()) -- keep image ratio
   menu_drawf(GAME.backgroundImage, canvas_width / 2, canvas_height / 2, "center", "center", 0, scale, scale)
@@ -139,6 +169,34 @@ function love.draw()
     local scale = canvas_width / math.max(GAME.background_overlay:getWidth(), GAME.background_overlay:getHeight()) -- keep image ratio
     menu_drawf(GAME.background_overlay, canvas_width / 2, canvas_height / 2, "center", "center", 0, scale, scale)
   end
+
+  if GAME.foreground_overlay then
+    local scale = canvas_width / math.max(GAME.foreground_overlay:getWidth(), GAME.foreground_overlay:getHeight()) -- keep image ratio
+    menu_drawf(GAME.foreground_overlay, canvas_width / 2, canvas_height / 2, "center", "center", 0, scale, scale)
+  end
+
+  -- Clear the screen
+  love.graphics.setBlendMode("alpha", "alphamultiply")
+  -- love.graphics.setCanvas(global_canvas)
+  -- love.graphics.clear()
+
+  if GAME.match then
+    GAME.match:draw()
+  end
+
+  --love.graphics.setCanvas()
+
+  -- local x, y, w, h = scale_letterbox(love.graphics.getWidth(), love.graphics.getHeight(), 16, 9)
+  -- love.graphics.setBlendMode("alpha", "premultiplied")
+  -- love.graphics.draw(global_canvas, x, y, 0, w / canvas_width, h / canvas_height)
+
+  Click_menu.drawMenus()
+
+  -- Draw the FPS if enabled
+  if config ~= nil and config.show_fps then
+    love.graphics.print("FPS: " .. love.timer.getFPS(), 1, 1)
+  end
+
 end
 
 -- Transform from window coordinates to game coordinates

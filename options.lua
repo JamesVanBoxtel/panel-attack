@@ -122,7 +122,6 @@ local function general_menu()
   update_replay_preference()
 
   while true do
-    generalMenu:draw()
     wait()
     variable_step(
       function()
@@ -199,7 +198,6 @@ local function graphics_menu()
   update_popfx(true)
 
   while true do
-    graphicsMenu:draw()
     wait()
     variable_step(
       function()
@@ -458,7 +456,6 @@ local function audio_menu(button_idx)
   end
 
   while true do
-    audioMenu:draw()
     wait()
     variable_step(
       function()
@@ -618,7 +615,6 @@ local function about_menu(button_idx)
   end
 
   while true do
-    aboutMenu:draw()
     wait()
     variable_step(
       function()
@@ -762,7 +758,6 @@ function options.main(button_idx)
   end
 
   while true do
-    optionsMenu:draw()
     wait()
     variable_step(
       function()

@@ -36,8 +36,7 @@ function draw(img, x, y, rot, x_scale, y_scale)
   rot = rot or 0
   x_scale = x_scale or 1
   y_scale = y_scale or 1
-  gfx_q:push({love.graphics.draw, {img, x*GFX_SCALE, y*GFX_SCALE,
-  rot, x_scale*GFX_SCALE, y_scale*GFX_SCALE}})
+  love.graphics.draw(img, x*GFX_SCALE, y*GFX_SCALE, rot, x_scale*GFX_SCALE, y_scale*GFX_SCALE)
 end
 
 -- Draws a label image at the given spot.
@@ -46,8 +45,7 @@ function draw_label(img, x, y, rot, scale, mirror)
   rot = rot or 0
   mirror = mirror or 0
   x = x - (img:getWidth()/GFX_SCALE*scale)*mirror
-  gfx_q:push({love.graphics.draw, {img, x*GFX_SCALE, y*GFX_SCALE,
-  rot, scale, scale}})
+  love.graphics.draw(img, x*GFX_SCALE, y*GFX_SCALE, rot, scale, scale)
 end
 
 -- Draws a number via a font image
@@ -76,16 +74,13 @@ function draw_number(number, atlas, frameCount, quads, x, y, scale, x_scale, y_s
     if c == nil then return end
     quads[i]:setViewport(tonumber(c)*numberWidth, 0, numberWidth, numberHeight, width, height)
     if align == "left" then
-      gfx_q:push({love.graphics.draw, {atlas, quads[i], ((x+(i*(13*scale)))-(13*scale)), y,
-        0, x_scale, y_scale}})
+      love.graphics.draw(atlas, quads[i], ((x+(i*(13*scale)))-(13*scale)), y, 0, x_scale, y_scale)
     end
     if align == "center" then
-      gfx_q:push({love.graphics.draw, {atlas, quads[i], (x+((i-(#tostring(number)/2))*(13*scale))), y,
-        0, x_scale, y_scale}})
+      love.graphics.draw(atlas, quads[i], (x+((i-(#tostring(number)/2))*(13*scale))), y, 0, x_scale, y_scale)
     end
     if align == "right" then
-      gfx_q:push({love.graphics.draw, {atlas, quads[i], (x+((i-#tostring(number))*(13*scale))), y,
-        0, x_scale, y_scale}})
+      love.graphics.draw(atlas, quads[i], (x+((i-#tostring(number))*(13*scale))), y, 0, x_scale, y_scale)
     end
   end
 
@@ -126,8 +121,7 @@ function draw_time(time, quads, x, y, x_scale, y_scale)
       else
         quads[i]:setViewport(symbolEnum[c]*numberWidth, 0, numberWidth, numberHeight, width, height)
       end
-      gfx_q:push({love.graphics.draw, {themes[config.theme].images.IMG_timeNumber_atlas, quads[i], ((x+(i*(20*themes[config.theme].time_Scale)))-(20*themes[config.theme].time_Scale))+((7-#time)*10), y,
-          0, x_scale, y_scale}})
+      love.graphics.draw(themes[config.theme].images.IMG_timeNumber_atlas, quads[i], ((x+(i*(20*themes[config.theme].time_Scale)))-(20*themes[config.theme].time_Scale))+((7-#time)*10), y, 0, x_scale, y_scale)
     end
 
   end
@@ -207,7 +201,7 @@ function draw_pixel_font(string, atlas, font_map, x, y, x_scale, y_scale, align,
     end
 
     -- Render it at the proper digit location
-    gfx_q:push({love.graphics.draw, {atlas, quads[i], characterX, y, 0, x_scale, y_scale}})
+    love.graphics.draw(atlas, quads[i], characterX, y, 0, x_scale, y_scale)
     ::continue::
   end
 
@@ -226,16 +220,14 @@ function qdraw(img, quad, x, y, rot, x_scale, y_scale, x_offset, y_offset, mirro
   if mirror == 1 then
     x = x - (qW*x_scale)
   end
-  gfx_q:push({love.graphics.draw, {img, quad, x*GFX_SCALE, y*GFX_SCALE,
-    rot, x_scale*GFX_SCALE, y_scale*GFX_SCALE, x_offset, y_offset}})
+  love.graphics.draw(img, quad, x*GFX_SCALE, y*GFX_SCALE, rot, x_scale*GFX_SCALE, y_scale*GFX_SCALE, x_offset, y_offset)
 end
 
 function menu_draw(img, x, y, rot, x_scale,y_scale)
   rot = rot or 0
   x_scale = x_scale or 1
   y_scale = y_scale or 1
-  gfx_q:push({love.graphics.draw, {img, x, y,
-    rot, x_scale, y_scale}})
+  love.graphics.draw(img, x, y, rot, x_scale, y_scale)
 end
 
 function menu_drawf(img, x, y, halign, valign, rot, x_scale, y_scale)
@@ -254,29 +246,27 @@ function menu_drawf(img, x, y, halign, valign, rot, x_scale, y_scale)
   elseif valign == "bottom" then
     y = y - math.floor(img:getHeight() * y_scale)
   end
-  gfx_q:push({love.graphics.draw, {img, x, y,
-    rot, x_scale, y_scale}})
+  love.graphics.draw(img, x, y, rot, x_scale, y_scale)
 end
 
 function menu_drawq(img, quad, x, y, rot, x_scale,y_scale)
   rot = rot or 0
   x_scale = x_scale or 1
   y_scale = y_scale or 1
-  gfx_q:push({love.graphics.draw, {img, quad, x, y,
-    rot, x_scale, y_scale}})
+  love.graphics.draw(img, quad, x, y, rot, x_scale, y_scale)
 end
 
 -- Draws a rectangle at the given coordinates
 function grectangle(mode, x, y, w, h)
-  gfx_q:push({love.graphics.rectangle, {mode, x, y, w, h}})
+  love.graphics.rectangle(mode, x, y, w, h)
 end
 
 -- Draws a colored rectangle at the given coordinates
 function grectangle_color(mode, x, y, w, h, r, g, b, a)
   a = a or 1
-  gfx_q:push({love.graphics.setColor, {r, g, b, a}})
-  gfx_q:push({love.graphics.rectangle, {mode, x*GFX_SCALE, y*GFX_SCALE, w*GFX_SCALE, h*GFX_SCALE}})
-  gfx_q:push({love.graphics.setColor, {1, 1, 1, 1}})
+  love.graphics.setColor(r, g, b, a)
+  love.graphics.rectangle(mode, x*GFX_SCALE, y*GFX_SCALE, w*GFX_SCALE, h*GFX_SCALE)
+  love.graphics.setColor(1, 1, 1, 1)
 end
 
 -- Draws text at the given spot
@@ -287,13 +277,13 @@ function gprint(str, x, y, color, scale)
   scale = scale or 1
   color = color or nil
   set_color(0, 0, 0, 1)
-  gfx_q:push({love.graphics.print, {str, x+1, y+1, 0, scale}})
+  love.graphics.print(str, x+1, y+1, 0, scale)
   local r, g, b, a = 1,1,1,1
   if color ~= nil then
     r,g,b,a = unpack(color)
   end
   set_color(r,g,b,a)
-  gfx_q:push({love.graphics.print, {str, x, y, 0, scale}})
+  love.graphics.print(str, x, y, 0, scale)
 end
 
 -- font file to use
@@ -341,11 +331,11 @@ function get_font_delta(with_delta_size)
 end
 
 function set_font(font)
-  gfx_q:push({love.graphics.setFont, {font}})
+  love.graphics.setFont(font)
 end
 
 function set_shader(shader)
-  gfx_q:push({love.graphics.setShader, {shader}})
+  love.graphics.setShader(shader)
 end
 
 -- Draws a font with a given font delta from the standard font
@@ -363,13 +353,13 @@ function gprintf(str, x, y, limit, halign, color, scale, font_delta_size)
   if font_delta_size ~= 0 then
     set_font(get_font_delta(font_delta_size)) 
   end
-  gfx_q:push({love.graphics.printf, {str, x+1, y+1, limit, halign, 0, scale}})
+  love.graphics.printf(str, x+1, y+1, limit, halign, 0, scale)
   local r, g, b, a = 1,1,1,1
   if color ~= nil then
     r,g,b,a = unpack(color)
   end
   set_color(r,g,b,a)
-  gfx_q:push({love.graphics.printf, {str, x, y, limit, halign, 0, scale}})
+  love.graphics.printf(str, x, y, limit, halign, 0, scale)
   if font_delta_size ~= 0 then set_font(old_font) end
 end
 
@@ -379,7 +369,7 @@ function set_color(r, g, b, a)
   -- only do it if this color isn't the same as the previous one...
   if _r~=r or _g~=g or _b~=b or _a~=a then
       _r,_g,_b,_a = r,g,b,a
-      gfx_q:push({love.graphics.setColor, {r, g, b, a}})
+      love.graphics.setColor(r, g, b, a)
   end
 end
 

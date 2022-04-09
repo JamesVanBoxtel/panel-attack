@@ -57,7 +57,7 @@ local P1_rating_quads = {}
 local P2_rating_quads = {}
 local P2_win_quads = {}
 
-function Match.render(self)
+function Match.draw(self)
   if GAME.droppedFrames > 10 and config.show_fps then
     gprint("Dropped Frames: " .. GAME.droppedFrames, 1, 12)
   end

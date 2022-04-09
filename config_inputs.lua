@@ -74,7 +74,6 @@ local function main_config_input()
 
   while true do
     gprintf(loc("config_input_welcome"), 0, menu_y - 30, canvas_width, "center")
-    input_menu:draw()
     wait()
     variable_step(
       function()
