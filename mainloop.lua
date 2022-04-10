@@ -117,6 +117,7 @@ end
 do
   function main_select_mode()
     CLICK_MENUS = {}
+    GAME.sceneDraw = nil
     if themes[config.theme].musics["main"] then
       find_and_add_music(themes[config.theme].musics, "main")
     end
@@ -1579,6 +1580,8 @@ end
 
 -- dumb transition that shows a black screen
 function main_dumb_transition(next_func, text, timemin, timemax, winnerSFX)
+  GAME.sceneDraw = nil
+
   stop_the_music()
   winnerSFX = winnerSFX or nil
   if not SFX_mute then

@@ -184,6 +184,10 @@ function love.draw()
     GAME.match:draw()
   end
 
+  if GAME.sceneDraw then
+    GAME.sceneDraw()
+  end
+
   --love.graphics.setCanvas()
 
   -- local x, y, w, h = scale_letterbox(love.graphics.getWidth(), love.graphics.getHeight(), 16, 9)
