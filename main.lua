@@ -90,6 +90,7 @@ function love.run()
 		-- Update dt, as we'll be passing it to update
 		if love.timer then dt = love.timer.step() end
 
+    -- Temporarily do this here instead of in draw as we have some graphics calls in update still
     love.graphics.origin()
     love.graphics.clear(love.graphics.getBackgroundColor())
 
@@ -99,14 +100,8 @@ function love.run()
 		if love.graphics and love.graphics.isActive() then
 
 			if love.draw then love.draw() end
-      
-      local startTime = love.timer.getTime()
-			love.graphics.present()
-      local endTime = love.timer.getTime()
 
-      local average = string.format("%0.4f", round(endTime - startTime, 4))
-      logger.warn("present: " .. average)
-  
+			love.graphics.present()
 
 		end
 
@@ -118,10 +113,12 @@ end
 -- dt is the amount of time in seconds that has passed.
 function love.update(dt)
 
+  -- Temporarily do this here instead of in draw as we have some graphics calls in update still
   local x, y, w, h = scale_letterbox(love.graphics.getWidth(), love.graphics.getHeight(), 16, 9)
   love.graphics.translate(x, y)
   love.graphics.scale(w / canvas_width, h / canvas_height)
 
+  -- Temporarily do this here instead of in draw as we have some graphics calls in update still
   -- draw background and its overlay
   local scale = canvas_width / math.max(GAME.backgroundImage:getWidth(), GAME.backgroundImage:getHeight()) -- keep image ratio
   menu_drawf(GAME.backgroundImage, canvas_width / 2, canvas_height / 2, "center", "center", 0, scale, scale)
@@ -149,11 +146,11 @@ function love.update(dt)
     end
   end
 
-  if GAME.match and leftover_time + dt > (1/60.0) then
-    --local average = string.format("%0.4f", round(dt, 4))
-    logger.error("slowness: " .. string.format("%0.4f", round(((leftover_time + dt) - (1/60)) / (1/60), 4)))
-    --logger.error("DT: " .. string.format("%0.4f", round(dt, 4)) .. " leftover before:" .. string.format("%0.4f", round(leftover_time, 4)) .. " slowness: " .. string.format("%0.4f", round(leftover_time + dt - (1 / 60), 4)))
-  end
+  -- if GAME.match and leftover_time + dt > (1/60.0) then
+  --   --local average = string.format("%0.4f", round(dt, 4))
+  --   --logger.error("slowness: " .. string.format("%0.4f", round(((leftover_time + dt) - (1/60)) / (1/60), 4)))
+  --   --logger.error("DT: " .. string.format("%0.4f", round(dt, 4)) .. " leftover before:" .. string.format("%0.4f", round(leftover_time, 4)) .. " slowness: " .. string.format("%0.4f", round(leftover_time + dt - (1 / 60), 4)))
+  -- end
   leftover_time = leftover_time + dt  
 
   local status, err = coroutine.resume(mainloop)
@@ -194,6 +191,7 @@ function love.draw()
   -- Draw the FPS if enabled
   if config ~= nil and config.show_fps then
     love.graphics.print("FPS: " .. love.timer.getFPS(), 1, 1)
+    --love.graphics.print("%: " .. string.format("%0.4f", round(leftover_time / (1/60), 4)), 1, 20)
   end
 
 end

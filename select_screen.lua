@@ -70,7 +70,7 @@ local function patch_is_random(refreshed) -- retrocompatibility
 end
 
 -- Grabs character / panel / stage settings based on our own mods if they are not set
-local function refresh_based_on_own_mods(refreshed, ask_change_fallback)
+function refresh_based_on_own_mods(refreshed, ask_change_fallback)
   patch_is_random(refreshed)
   ask_change_fallback = ask_change_fallback or false
   if refreshed ~= nil then
