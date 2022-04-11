@@ -63,6 +63,7 @@ end
 function love.focus(f)
   GAME.focused = f
 end
+
 function love.run()
 	if love.load then love.load(love.arg.parseGameArguments(arg), arg) end
 
@@ -89,12 +90,13 @@ function love.run()
 		-- Update dt, as we'll be passing it to update
 		if love.timer then dt = love.timer.step() end
 
+    love.graphics.origin()
+    love.graphics.clear(love.graphics.getBackgroundColor())
+
 		-- Call update and draw
 		if love.update then love.update(dt) end -- will pass 0 if love.timer is disabled
 
 		if love.graphics and love.graphics.isActive() then
-			love.graphics.origin()
-			love.graphics.clear(love.graphics.getBackgroundColor())
 
 			if love.draw then love.draw() end
       
@@ -115,6 +117,19 @@ end
 -- Called every few fractions of a second to update the game
 -- dt is the amount of time in seconds that has passed.
 function love.update(dt)
+
+  local x, y, w, h = scale_letterbox(love.graphics.getWidth(), love.graphics.getHeight(), 16, 9)
+  love.graphics.translate(x, y)
+  love.graphics.scale(w / canvas_width, h / canvas_height)
+
+  -- draw background and its overlay
+  local scale = canvas_width / math.max(GAME.backgroundImage:getWidth(), GAME.backgroundImage:getHeight()) -- keep image ratio
+  menu_drawf(GAME.backgroundImage, canvas_width / 2, canvas_height / 2, "center", "center", 0, scale, scale)
+  if GAME.background_overlay then
+    local scale = canvas_width / math.max(GAME.background_overlay:getWidth(), GAME.background_overlay:getHeight()) -- keep image ratio
+    menu_drawf(GAME.background_overlay, canvas_width / 2, canvas_height / 2, "center", "center", 0, scale, scale)
+  end
+  
   if love.mouse.getX() == last_x and love.mouse.getY() == last_y then
     if not pointer_hidden then
       if input_delta > mouse_pointer_timeout then
@@ -135,10 +150,11 @@ function love.update(dt)
   end
 
   if GAME.match and leftover_time + dt > (1/60.0) then
-    local average = string.format("%0.4f", round(dt, 4))
-    logger.error("DT: " .. string.format("%0.4f", round(dt, 4)) .. " leftover before:" .. string.format("%0.4f", round(leftover_time, 4)) .. " slowness: " .. string.format("%0.4f", round(leftover_time + dt - (1 / 60), 4)))
+    --local average = string.format("%0.4f", round(dt, 4))
+    logger.error("slowness: " .. string.format("%0.4f", round(((leftover_time + dt) - (1/60)) / (1/60), 4)))
+    --logger.error("DT: " .. string.format("%0.4f", round(dt, 4)) .. " leftover before:" .. string.format("%0.4f", round(leftover_time, 4)) .. " slowness: " .. string.format("%0.4f", round(leftover_time + dt - (1 / 60), 4)))
   end
-  leftover_time = leftover_time + dt
+  leftover_time = leftover_time + dt  
 
   local status, err = coroutine.resume(mainloop)
   if not status then
@@ -160,25 +176,10 @@ end
 -- Called whenever the game needs to draw.
 function love.draw()
 
-  love.graphics.clear(love.graphics.getBackgroundColor())
-  
-  -- draw background and its overlay
-  local scale = canvas_width / math.max(GAME.backgroundImage:getWidth(), GAME.backgroundImage:getHeight()) -- keep image ratio
-  menu_drawf(GAME.backgroundImage, canvas_width / 2, canvas_height / 2, "center", "center", 0, scale, scale)
-  if GAME.background_overlay then
-    local scale = canvas_width / math.max(GAME.background_overlay:getWidth(), GAME.background_overlay:getHeight()) -- keep image ratio
-    menu_drawf(GAME.background_overlay, canvas_width / 2, canvas_height / 2, "center", "center", 0, scale, scale)
-  end
-
   if GAME.foreground_overlay then
     local scale = canvas_width / math.max(GAME.foreground_overlay:getWidth(), GAME.foreground_overlay:getHeight()) -- keep image ratio
     menu_drawf(GAME.foreground_overlay, canvas_width / 2, canvas_height / 2, "center", "center", 0, scale, scale)
   end
-
-  -- Clear the screen
-  love.graphics.setBlendMode("alpha", "alphamultiply")
-  -- love.graphics.setCanvas(global_canvas)
-  -- love.graphics.clear()
 
   if GAME.match then
     GAME.match:draw()
@@ -187,12 +188,6 @@ function love.draw()
   if GAME.sceneDraw then
     GAME.sceneDraw()
   end
-
-  --love.graphics.setCanvas()
-
-  -- local x, y, w, h = scale_letterbox(love.graphics.getWidth(), love.graphics.getHeight(), 16, 9)
-  -- love.graphics.setBlendMode("alpha", "premultiplied")
-  -- love.graphics.draw(global_canvas, x, y, 0, w / canvas_width, h / canvas_height)
 
   Click_menu.drawMenus()
 
