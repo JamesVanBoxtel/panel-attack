@@ -259,10 +259,16 @@ function Stack.render(self)
     love.graphics.setShader()
   end
 
+  love.graphics.push()
+  love.graphics.origin()
+  --love.graphics.translate(x, y)
+  --love.graphics.scale(1, 1)
+  
   love.graphics.setCanvas({self.canvas, stencil = true})
   love.graphics.clear()
   love.graphics.stencil(frame_mask, "replace", 1)
   love.graphics.setStencilTest("greater", 0)
+
 
   time_quads = {}
   move_quads = {}
@@ -465,6 +471,7 @@ function Stack.render(self)
 
   love.graphics.setStencilTest()
   love.graphics.setCanvas()
+  love.graphics.pop()
   love.graphics.draw(self.canvas, (self.pos_x - 4) * GFX_SCALE, (self.pos_y - 4) * GFX_SCALE)
 
   self:draw_popfxs()
