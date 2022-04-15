@@ -1804,4 +1804,8 @@ function love.quit()
   end
   config.fullscreen = love.window.getFullscreen()
   write_conf_file()
+
+  PROFILER.write("prof.mpack")
+
+  return false
 end
