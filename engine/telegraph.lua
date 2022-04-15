@@ -106,12 +106,6 @@ function Telegraph.rollbackCopy(self, source, other)
   return other
 end
 
-  -- We don't want saved copies to hold on to stacks, up to the rollback restore to set these back up.
-  other.sender = nil
-  other.owner = nil
-  return other
-end
-
 -- Adds a piece of garbage to the queue
 function Telegraph:push(garbage, attack_origin_col, attack_origin_row, frame_earned)
 
