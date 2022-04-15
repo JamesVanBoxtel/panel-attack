@@ -403,13 +403,8 @@ function Stack.restoreFromRollbackCopy(self, other)
   PROFILER.push("restoreFromRollbackCopy", self.which .. " " .. self.CLOCK)
   self:rollbackCopy(other, self)
   if self.telegraph then
-<<<<<<< HEAD
-    self.telegraph.owner = self
-    self.telegraph.sender = self.garbage_target
-=======
     self.telegraph.owner = self.garbage_target
     self.telegraph.sender = self
->>>>>>> alpha
   end
   -- The remaining inputs is the confirmed inputs not processed yet for this clock time
   -- We have processed CLOCK time number of inputs when we are at CLOCK, so we only want to process the CLOCK+1 input on
