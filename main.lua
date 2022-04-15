@@ -59,15 +59,9 @@ function love.focus(f)
   GAME.focused = f
 end
 
-PROF_CAPTURE = false
-PROFILER = require("jprof")
-
 -- Called every few fractions of a second to update the game
 -- dt is the amount of time in seconds that has passed.
 function love.update(dt)
-
-  PROFILER.push("frame")
-
   if love.mouse.getX() == last_x and love.mouse.getY() == last_y then
     if not pointer_hidden then
       if input_delta > mouse_pointer_timeout then
@@ -106,11 +100,8 @@ function love.update(dt)
   GAME.rich_presence:runCallbacks()
 end
 
-
-
 -- Called whenever the game needs to draw.
 function love.draw()
-  PROFILER.push("draw", "")
   -- if not main_font then
   -- main_font = love.graphics.newFont("Oswald-Light.ttf", 15)
   -- end
@@ -155,10 +146,6 @@ function love.draw()
     local scale = canvas_width / math.max(GAME.background_overlay:getWidth(), GAME.background_overlay:getHeight()) -- keep image ratio
     menu_drawf(GAME.background_overlay, canvas_width / 2, canvas_height / 2, "center", "center", 0, scale, scale)
   end
-
-
-  PROFILER.pop("draw")
-  PROFILER.pop("frame")
 end
 
 -- Transform from window coordinates to game coordinates
