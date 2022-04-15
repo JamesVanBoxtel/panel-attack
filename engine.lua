@@ -403,8 +403,13 @@ function Stack.restoreFromRollbackCopy(self, other)
   PROFILER.push("restoreFromRollbackCopy", self.which .. " " .. self.CLOCK)
   self:rollbackCopy(other, self)
   if self.telegraph then
+<<<<<<< HEAD
     self.telegraph.owner = self
     self.telegraph.sender = self.garbage_target
+=======
+    self.telegraph.owner = self.garbage_target
+    self.telegraph.sender = self
+>>>>>>> alpha
   end
   -- The remaining inputs is the confirmed inputs not processed yet for this clock time
   -- We have processed CLOCK time number of inputs when we are at CLOCK, so we only want to process the CLOCK+1 input on
@@ -429,18 +434,12 @@ function Stack.rollbackToFrame(self, frame)
     assert(prev_states[frame])
     self:restoreFromRollbackCopy(prev_states[frame])
 
-    if self.garbage_target and self.garbage_target.telegraph then
+    if self.garbage_target and self.garbage_target.later_garbage then
       -- The garbage that we send this time might (rarely) not be the same
       -- as the garbage we sent before.  Wipe out the garbage we sent before...
-      for k, v in pairs(self.garbage_target.telegraph.pendingGarbage) do
+      for k, v in pairs(self.garbage_target.later_garbage) do
         if k > frame then
-          self.garbage_target.telegraph.pendingGarbage[k] = nil
-        end
-      end
-
-      for k, v in pairs(self.garbage_target.telegraph.pendingChainingEnded) do
-        if k > frame then
-          self.garbage_target.telegraph.pendingChainingEnded[k] = nil
+          self.garbage_target.later_garbage[k] = nil
         end
       end
     end
@@ -479,9 +478,9 @@ end
 
 function Stack.set_garbage_target(self, new_target)
   self.garbage_target = new_target
-  if new_target.telegraph then
-    new_target.telegraph.sender = self
-    new_target.telegraph.garbage_queue.sender = self
+  if self.telegraph then
+    self.telegraph.owner = new_target
+    self.telegraph:updatePosition()
   end
 end
 
@@ -1139,10 +1138,6 @@ function Stack.simulate(self)
       end
     end
 
-    if self.telegraph then
-      self.telegraph:update()
-    end
-
     -- Phase 2. /////////////////////////////////////////////////////////////
     -- Timer-expiring actions + falling
     local propogate_fall = {false, false, false, false, false, false}
@@ -1518,7 +1513,7 @@ function Stack.simulate(self)
       self.chain_counter = 0
 
       if self.garbage_target and self.garbage_target.telegraph then
-        self.garbage_target.telegraph:chainingEnded(self.CLOCK)
+        self.telegraph:chainingEnded(self.CLOCK)
       end
     end
 
@@ -1541,11 +1536,10 @@ function Stack.simulate(self)
     if self.telegraph then
       local to_send = self.telegraph:pop_all_ready_garbage(self.CLOCK)
       if to_send and to_send[1] then
-        local garbage = self.later_garbage[self.CLOCK+1] or {}
-        for i = 1, #to_send do
-          garbage[#garbage + 1] = to_send[i]
-        end
-        self.later_garbage[self.CLOCK+1] = garbage
+        -- Right now the training attacks are put on the players telegraph, 
+        -- but they really should be a seperate telegraph since the telegraph on the player's stack is for sending outgoing attacks.
+        local receiver = self.garbage_target or self 
+        receiver:receiveGarbage(self.CLOCK + GARBAGE_DELAY_LAND_TIME, to_send)
       end
     end
     
@@ -1826,6 +1820,20 @@ function Stack.simulate(self)
   self:update_cards()
 
   PROFILER.pop("simulate")
+end
+
+function Stack:receiveGarbage(frameToReceive, garbageList)
+
+  -- If we are past the frame the attack would be processed we need to rollback
+  if self.CLOCK > frameToReceive then
+    self:rollbackToFrame(frameToReceive)
+  end
+
+  local garbage = self.later_garbage[frameToReceive] or {}
+  for i = 1, #garbageList do
+    garbage[#garbage + 1] = garbageList[i]
+  end
+  self.later_garbage[frameToReceive] = garbage
 end
 
 function Stack:updateFramesBehind()
@@ -2350,8 +2358,8 @@ function Stack.check_matches(self)
 
   if (combo_size ~= 0) then
     self.combos[self.CLOCK] = combo_size
-    if self.garbage_target and self.garbage_target.telegraph and metal_count == 3 and combo_size >= 3 then
-      self.garbage_target.telegraph:push({6, 1, true, false}, first_panel_col, first_panel_row, self.CLOCK)
+    if self.garbage_target and self.telegraph and metal_count == 3 and combo_size >= 3 then
+      self.telegraph:push({6, 1, true, false}, first_panel_col, first_panel_row, self.CLOCK)
     end
     self.analytic:register_destroyed_panels(combo_size)
     if (combo_size > 3) then
@@ -2369,16 +2377,16 @@ function Stack.check_matches(self)
       end
 
       self:enqueue_card(false, first_panel_col, first_panel_row, combo_size)
-      if self.garbage_target and self.garbage_target.telegraph then
+      if self.garbage_target and self.telegraph then
         if metal_count > 3 then
           for i = 3, metal_count do
-            self.garbage_target.telegraph:push({6, 1, true, false}, first_panel_col, first_panel_row, self.CLOCK)
+            self.telegraph:push({6, 1, true, false}, first_panel_col, first_panel_row, self.CLOCK)
           end
         end
         if metal_count ~= combo_size then
           local combo_pieces = combo_garbage[combo_size]
           for i=1,#combo_pieces do
-            self.garbage_target.telegraph:push({combo_pieces[i], 1, false, false}, first_panel_col, first_panel_row, self.CLOCK)
+            self.telegraph:push({combo_pieces[i], 1, false, false}, first_panel_col, first_panel_row, self.CLOCK)
           end
         end
       end
@@ -2396,8 +2404,8 @@ function Stack.check_matches(self)
       self:enqueue_card(true, first_panel_col, first_panel_row, self.chain_counter)
     --EnqueueConfetti(first_panel_col<<4+P1StackPosX+4,
     --          first_panel_row<<4+P1StackPosY+self.displacement-9);
-      if self.garbage_target and self.garbage_target.telegraph then
-        self.garbage_target.telegraph:push({6, self.chain_counter - 1, false, true}, first_panel_col, first_panel_row, self.CLOCK)
+      if self.garbage_target and self.telegraph then
+        self.telegraph:push({6, self.chain_counter - 1, false, true}, first_panel_col, first_panel_row, self.CLOCK)
       end
     end
     local chain_bonus = self.chain_counter
@@ -2412,7 +2420,7 @@ function Stack.check_matches(self)
       if self.panels_in_top_row and is_chain then
         if self.level then
           local length = (self.chain_counter > 4) and 6 or self.chain_counter
-          stop_time = -8 * self.level + 168 + (self.chain_counter - 1) * (-2 * self.level + 22)
+          stop_time = -8 * self.level + 168 + (length - 1) * (-2 * self.level + 22)
         else
           stop_time = stop_time_danger[self.difficulty]
         end

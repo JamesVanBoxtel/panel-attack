@@ -115,8 +115,11 @@ end
 do
   function main_select_mode()
     CLICK_MENUS = {}
-    if themes[config.theme].musics["main"] then
-      find_and_add_music(themes[config.theme].musics, "main")
+    if next(currently_playing_tracks) == nil then
+      stop_the_music()
+      if themes[config.theme].musics["main"] then
+        find_and_add_music(themes[config.theme].musics, "main")
+      end
     end
     character_loader_clear()
     stage_loader_clear()
@@ -189,9 +192,12 @@ do
           GAME_UPDATER_GAME_VERSION = "NEW VERSION FOUND! RESTART THE GAME!"
         end
       end
+      
+      local loveString = Game.loveVersionString()
+      gprintf("Love Version: " .. loveString, -5, 705, canvas_width, "right")
 
       if GAME_UPDATER_GAME_VERSION then
-        gprintf("version: " .. GAME_UPDATER_GAME_VERSION, -2, 705, canvas_width, "right")
+        gprintf("PA Version: " .. GAME_UPDATER_GAME_VERSION, -5, 690, canvas_width, "right")
         if has_game_update then
           menu_draw(panels[config.panels].images.classic[1][1], 1262, 685)
         end
@@ -607,8 +613,11 @@ local function main_select_speed_99(mode)
 
   GAME.backgroundImage = themes[config.theme].images.bg_main
   reset_filters()
-  if themes[config.theme].musics["main"] then
-    find_and_add_music(themes[config.theme].musics, "main")
+  if next(currently_playing_tracks) == nil then
+    stop_the_music()
+    if themes[config.theme].musics["main"] then
+      find_and_add_music(themes[config.theme].musics, "main")
+    end
   end
 
   local gameSettingsMenu
@@ -726,8 +735,11 @@ end
 
 -- The menu where you spectate / join net vs games
 function main_net_vs_lobby()
-  if themes[config.theme].musics.main then
-    find_and_add_music(themes[config.theme].musics, "main")
+  if next(currently_playing_tracks) == nil then
+    stop_the_music()
+    if themes[config.theme].musics["main"] then
+      find_and_add_music(themes[config.theme].musics, "main")
+    end
   end
   GAME.backgroundImage = themes[config.theme].images.bg_main
   GAME.battleRoom = nil
@@ -1515,8 +1527,11 @@ do
   end
   items[#items + 1] = {"back", main_select_mode}
   function main_select_puzz()
-    if themes[config.theme].musics.main then
-      find_and_add_music(themes[config.theme].musics, "main")
+    if next(currently_playing_tracks) == nil then
+      stop_the_music()
+      if themes[config.theme].musics["main"] then
+        find_and_add_music(themes[config.theme].musics, "main")
+      end
     end
     GAME.backgroundImage = themes[config.theme].images.bg_main
     reset_filters()
