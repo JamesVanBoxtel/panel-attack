@@ -89,10 +89,7 @@ function love.update(dt)
 
   leftover_time = leftover_time + dt
 
-  PROFILER.push("coroutine")
   local status, err = coroutine.resume(mainloop)
-  PROFILER.pop("coroutine")
-
   if not status then
     local errorData = Game.errorData(err, debug.traceback(mainloop))
     if GAME_UPDATER_GAME_VERSION then

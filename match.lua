@@ -247,8 +247,6 @@ local P2_rating_quads = {}
 local P2_win_quads = {}
 
 function Match.render(self)
-
-  PROFILER.push("renderMatch")
   local P1 = self.P1
   local P2 = self.P2
   
@@ -479,6 +477,4 @@ function Match.render(self)
       end
     end
   end
-
-  PROFILER.pop("renderMatch")
 end
