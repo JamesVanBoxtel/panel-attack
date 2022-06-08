@@ -224,3 +224,13 @@ garbage_to_shake_time = {
 for i=25,1000 do
   garbage_to_shake_time[i] = garbage_to_shake_time[i-1]
 end
+
+leagues = { {league="Copper",      min_rating = -1000, imageName = "00_Copper"},
+            {league="Bronze",       min_rating = 1125, imageName = "01_Bronze"},
+            {league="Silver",       min_rating = 1275, imageName = "02_Silver"},
+            {league="Gold",         min_rating = 1425, imageName = "03_Gold"},
+            {league="Platinum",     min_rating = 1575, imageName = "04_Platinum"},
+            {league="Diamond",      min_rating = 1725, imageName = "05_Diamond"},
+            {league="Master",       min_rating = 1875, imageName = "06_Master"},
+            {league="Grandmaster",  min_rating = 2025, imageName = "07_Grandmaster"}
+          }

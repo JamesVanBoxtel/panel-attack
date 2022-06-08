@@ -244,6 +244,15 @@ local mask_shader = love.graphics.newShader [[
    }
 ]]
 
+function Stack:drawLevel()
+  --gprint(loc("pl_level", self.level), self.score_x, self.score_y+70)
+  draw_label(themes[config.theme].images["IMG_level" .. self.id], self.origin_x + themes[config.theme].levelLabel_Pos[1] * self.mirror_x, self.pos_y + themes[config.theme].levelLabel_Pos[2], 0, themes[config.theme].levelLabel_Scale, self.multiplication)
+
+  local level_atlas = themes[config.theme].images["IMG_levelNumber_atlas" .. self.id]
+  level_quad:setViewport(tonumber(self.level - 1) * (level_atlas:getWidth() / 11), 0, level_atlas:getWidth() / 11, level_atlas:getHeight(), level_atlas:getDimensions())
+  qdraw(level_atlas, level_quad, (self.origin_x + themes[config.theme].level_Pos[1] * self.mirror_x), (self.pos_y + themes[config.theme].level_Pos[2]), 0, (28 / themes[config.theme].images["levelNumberWidth" .. self.id] * themes[config.theme].level_Scale) / GFX_SCALE, (26 / themes[config.theme].images["levelNumberHeight" .. self.id] * themes[config.theme].level_Scale / GFX_SCALE), 0, 0, self.multiplication)
+end
+
 -- Renders the player's stack on screen
 function Stack.render(self)
   if self.canvas == nil then
@@ -522,6 +531,9 @@ function Stack.render(self)
     if config.show_ingame_infos then
     --gprint(loc("pl_frame", self.CLOCK), self.score_x, self.score_y+30)
     end
+    if self.level then
+      self:drawLevel()
+    end
   else
     -- Draw the "extra" game info
     if config.show_ingame_infos then
@@ -552,12 +564,7 @@ function Stack.render(self)
       draw_time(string.format("%01d:%02d", mins, secs), time_quads, main_infos_screen_pos.x + themes[config.theme].time_Pos[1], main_infos_screen_pos.y + themes[config.theme].time_Pos[2], 20 / themes[config.theme].images.timeNumberWidth * themes[config.theme].time_Scale, 26 / themes[config.theme].images.timeNumberHeight * themes[config.theme].time_Scale)
     -- Draw the current difficulty level
     elseif self.level then
-      --gprint(loc("pl_level", self.level), self.score_x, self.score_y+70)
-      draw_label(themes[config.theme].images["IMG_level" .. self.id], self.origin_x + themes[config.theme].levelLabel_Pos[1] * self.mirror_x, self.pos_y + themes[config.theme].levelLabel_Pos[2], 0, themes[config.theme].levelLabel_Scale, self.multiplication)
-
-      level_atlas = themes[config.theme].images["IMG_levelNumber_atlas" .. self.id]
-      level_quad:setViewport(tonumber(self.level - 1) * (level_atlas:getWidth() / 11), 0, level_atlas:getWidth() / 11, level_atlas:getHeight(), level_atlas:getDimensions())
-      qdraw(level_atlas, level_quad, (self.origin_x + themes[config.theme].level_Pos[1] * self.mirror_x), (self.pos_y + themes[config.theme].level_Pos[2]), 0, (28 / themes[config.theme].images["levelNumberWidth" .. self.id] * themes[config.theme].level_Scale) / GFX_SCALE, (26 / themes[config.theme].images["levelNumberHeight" .. self.id] * themes[config.theme].level_Scale / GFX_SCALE), 0, 0, self.multiplication)
+      self:drawLevel()
     end
     -- Draw the stop time and healthbars
     if config.show_ingame_infos then

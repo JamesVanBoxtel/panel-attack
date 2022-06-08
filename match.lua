@@ -240,6 +240,49 @@ function Match:run()
   self.maxTimeSpentRunning = math.max(self.maxTimeSpentRunning, timeDifference)
 end
 
+
+function Match:drawPlayerDetails(playerNumber)
+  local width = self:drawLeague(playerNumber)
+  local playerX = themes[config.theme].namePositions[playerNumber][1]
+  if width then
+    playerX = playerX + width
+  end
+  self:drawPlayerName(playerNumber, playerX)
+end
+
+function Match:drawPlayerName(playerNumber, xPosition)
+  assert(playerNumber == 1 or playerNumber == 2)
+
+  local playerName = (GAME.battleRoom.playerNames[playerNumber] or "")
+  if playerNumber == 1 then
+    gprintf(playerName, xPosition, themes[config.theme].namePositions[2][2], canvas_width - xPosition, "left", nil, nil, 10)
+  else
+    gprintf(playerName, 0, themes[config.theme].namePositions[2][2], xPosition, "right", nil, nil, 10)
+  end
+end
+
+function Match:drawLeague(playerNumber)
+
+  local league = global_current_room_ratings[playerNumber].league
+  if league then
+    local leagueImage = themes[config.theme].images.leagues[league]
+    if leagueImage then
+      local iconSize = 10
+      local icon_width, icon_height = leagueImage:getDimensions()
+      local scale = iconSize / math.max(icon_width, icon_height)
+      local x = themes[config.theme].namePositions[playerNumber][1]
+      if playerNumber == 1 then
+        x = x - 40
+      else
+        x = x + 10
+      end
+      draw(themes[config.theme].images.leagues[league], x / GFX_SCALE, 16 / GFX_SCALE, nil, scale, scale)
+      return icon_width * scale
+    end
+  end
+  return nil
+end
+
 local P1_win_quads = {}
 local P1_rating_quads = {}
 
@@ -281,14 +324,16 @@ function Match.render(self)
 
   -- Draw VS HUD
   if self.battleRoom and (GAME.gameIsPaused == false or GAME.renderDuringPause) then
-    -- P1 username
-    gprint((GAME.battleRoom.playerNames[1] or ""), P1.score_x + themes[config.theme].name_Pos[1], P1.score_y + themes[config.theme].name_Pos[2])
+
+    self:drawPlayerDetails(1)
+
     if P2 then
       -- P1 win count graphics
       draw_label(themes[config.theme].images.IMG_wins, (P1.score_x + themes[config.theme].winLabel_Pos[1]) / GFX_SCALE, (P1.score_y + themes[config.theme].winLabel_Pos[2]) / GFX_SCALE, 0, themes[config.theme].winLabel_Scale)
       draw_number(GAME.battleRoom.playerWinCounts[P1.player_number], themes[config.theme].images.IMG_timeNumber_atlas, 12, P1_win_quads, P1.score_x + themes[config.theme].win_Pos[1], P1.score_y + themes[config.theme].win_Pos[2], themes[config.theme].win_Scale, 20 / themes[config.theme].images.timeNumberWidth * themes[config.theme].time_Scale, 26 / themes[config.theme].images.timeNumberHeight * themes[config.theme].time_Scale, "center")
-      -- P2 username
-      gprint((GAME.battleRoom.playerNames[2] or ""), P2.score_x + themes[config.theme].name_Pos[1], P2.score_y + themes[config.theme].name_Pos[2])
+
+      self:drawPlayerDetails(2)
+
       -- P2 win count graphics
       draw_label(themes[config.theme].images.IMG_wins, (P2.score_x + themes[config.theme].winLabel_Pos[1]) / GFX_SCALE, (P2.score_y + themes[config.theme].winLabel_Pos[2]) / GFX_SCALE, 0, themes[config.theme].winLabel_Scale)
       draw_number(GAME.battleRoom.playerWinCounts[P2.player_number], themes[config.theme].images.IMG_timeNumber_atlas, 12, P2_win_quads, P2.score_x + themes[config.theme].win_Pos[1], P2.score_y + themes[config.theme].win_Pos[2], themes[config.theme].win_Scale, 20 / themes[config.theme].images.timeNumberWidth * themes[config.theme].time_Scale, 26 / themes[config.theme].images.timeNumberHeight * themes[config.theme].time_Scale, "center")

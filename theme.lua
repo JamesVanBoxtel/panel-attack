@@ -44,7 +44,7 @@ Theme =
     self.timeLabel_Scale = 2 -- the scale size of the timer label
     self.time_Pos = {-40, 25} -- the position of the timer
     self.time_Scale = 1 -- the scale size of the timer
-    self.name_Pos = {20, -30} -- the position of the name
+    self.namePositions = {{(1280/2) - 440, 20}, {(1280/2) + 440, 20}} -- the position of the names
     self.moveLabel_Pos = {465, 170} -- the position of the move label
     self.moveLabel_Scale = 2 -- the scale size of the move label
     self.move_Pos = {20, 35} -- the position of the move
@@ -126,6 +126,11 @@ function Theme.graphics_init(self)
   self.images.flags = {}
   for _, flag in ipairs(flags) do
     self.images.flags[flag] = load_theme_img("flags/" .. flag)
+  end
+
+  self.images.leagues = {}
+  for _, league in ipairs(leagues) do
+    self.images.leagues[league.league] = load_theme_img("leagues/" .. league.imageName)
   end
 
   self.images.bg_overlay = load_theme_img("background/bg_overlay")
@@ -506,8 +511,8 @@ function Theme.json_init(self)
   end
 
   -- Name position
-  if read_data.name_Pos and type(read_data.name_Pos) == "table" then
-    self.name_Pos = read_data.name_Pos
+  if read_data.namePositions and type(read_data.namePositions) == "table" then
+    self.namePositions = read_data.namePositions
   end
 
   -- Rating label position
