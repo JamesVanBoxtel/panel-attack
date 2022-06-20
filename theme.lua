@@ -243,6 +243,9 @@ function Theme.graphics_init(self)
   --self.images.IMG_frame8P = load_theme_img("frame/frame8P")
   --self.images.IMG_wall8P = load_theme_img("frame/wall8P")
 
+  self.images.IMG_overtime = load_theme_img("Overtime")
+  self.images.IMG_superOvertime = load_theme_img("SuperOvertime")
+
   self.images.IMG_swap = load_theme_img("swap")
   self.images.IMG_apm = load_theme_img("apm")
   self.images.IMG_gpm = load_theme_img("GPM")

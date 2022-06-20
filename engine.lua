@@ -988,6 +988,18 @@ function Stack.enqueue_card(self, chain, x, y, n)
   self.card_q:push({frame = 1, chain = chain, x = x, y = y, n = n, burstAtlas = card_burstAtlas, burstParticle = card_burstParticle})
 end
 
+function Stack:updatePanelsCleared()
+  self.panels_cleared = self.panels_cleared + 1
+  if self.match.mode == "vs" then
+    if self.panels_cleared % level_to_metal_panel_frequency[self.level] == 0 then
+      self.metal_panels_queued = min(self.metal_panels_queued + 1, level_to_metal_panel_cap[self.level])
+    end
+  end
+  if self:shouldChangeSoundEffects() then
+    SFX_Pop_Play = 1
+  end
+end
+
 -- Enqueue a pop animation
 function Stack.enqueue_popfx(self, x, y, popsize)
   if self.canvas == nil then
@@ -1456,18 +1468,12 @@ function Stack.simulate(self)
               -- If it is the last panel to pop,
               -- it should be removed immediately!
               if panel.combo_size == panel.combo_index then
-                self.panels_cleared = self.panels_cleared + 1
-                if self.match.mode == "vs" and self.panels_cleared % level_to_metal_panel_frequency[self.level] == 0 then
-                  self.metal_panels_queued = min(self.metal_panels_queued + 1, level_to_metal_panel_cap[self.level])
-                end
-                if self:shouldChangeSoundEffects() then
-                  SFX_Pop_Play = 1
-                end
+                self:updatePanelsCleared()
                 self.poppedPanelIndex = panel.combo_index
                 panel.color = 0
-		if self.panels_to_speedup then
-	          self.panels_to_speedup = self.panels_to_speedup - 1
-	        end
+		            if self.panels_to_speedup then
+	                self.panels_to_speedup = self.panels_to_speedup - 1
+	              end
                 if panel.chaining then
                   self.n_chain_panels = self.n_chain_panels - 1
                 end
@@ -1476,13 +1482,7 @@ function Stack.simulate(self)
               else
                 panel.state = "popped"
                 panel.timer = (panel.combo_size - panel.combo_index) * self.FRAMECOUNT_POP
-                self.panels_cleared = self.panels_cleared + 1
-                if self.match.mode == "vs" and self.panels_cleared % level_to_metal_panel_frequency[self.level] == 0 then
-                  self.metal_panels_queued = min(self.metal_panels_queued + 1, level_to_metal_panel_cap[self.level])
-                end
-                if self:shouldChangeSoundEffects() then
-                  SFX_Pop_Play = 1
-                end
+                self:updatePanelsCleared()
                 self.poppedPanelIndex = panel.combo_index
               end
             elseif panel.state == "popped" then
@@ -2079,6 +2079,18 @@ function Stack.gameResult(self)
   return nil
 end
 
+Stack.overtimeStartFrame = 60 * (60 + 3)
+Stack.superOvertimeStartFrame = 60 * (120 + 3)
+
+function Stack:currentOvertimeLevel()
+  if self.CLOCK >= Stack.superOvertimeStartFrame then
+    return 2
+  elseif self.CLOCK >= Stack.overtimeStartFrame then
+    return 1
+  end
+  return 0
+end
+
 -- Sets the current stack as "lost"
 -- Also begins drawing game over effects
 function Stack.set_game_over(self)
@@ -2401,6 +2413,7 @@ function Stack.check_matches(self)
     local gpan_row = nil
     for col = self.width, 1, -1 do
       local panel = panels[row][col]
+      -- Go through every garbage panel that matched
       if garbage[panel] then
         panel.state = "matched"
         panel.timer = garbage_match_time + 1
@@ -2420,7 +2433,25 @@ function Stack.check_matches(self)
             gpan_row = string.sub(self.gpanel_buffer, 1, 6)
             self.gpanel_buffer = string.sub(self.gpanel_buffer, 7)
           end
-          panel.color = string.sub(gpan_row, col, col) + 0
+
+          local this_panel_character = string.sub(gpan_row, col, col)
+          local this_panel_color
+          local currentOvertimeLevel = self:currentOvertimeLevel()
+          if currentOvertimeLevel > 1 and this_panel_character >= "A" and this_panel_character <= "Z" then
+            -- Super Overtime:
+            -- This has gone long enough, someone needs to die.
+            -- Include a second shock panel per garbage block.
+            this_panel_color = 8
+          elseif currentOvertimeLevel > 0 and this_panel_character >= "a" and this_panel_character <= "z" then
+            -- Basic Overtime:
+            -- Include one shock panel per garbage row.
+            this_panel_color = 8
+          else
+            this_panel_color = panel_color_to_number[this_panel_character]
+          end
+
+          panel.color = this_panel_color
+
           if is_chain then
             panel.chaining = true
             self.n_chain_panels = self.n_chain_panels + 1
@@ -2683,24 +2714,25 @@ function Stack.new_row(self)
   for col = 1, self.width do
     local panel = Panel()
     panels[0][col] = panel
-    local this_panel_color = string.sub(self.panel_buffer, col, col)
+    local this_panel_character = string.sub(self.panel_buffer, col, col)
+    local this_panel_color
     --a capital letter for the place where the first shock block should spawn (if earned), and a lower case letter is where a second should spawn (if earned).  (color 8 is metal)
-    if tonumber(this_panel_color) then
-      --do nothing special
-    elseif this_panel_color >= "A" and this_panel_color <= "Z" then
+    if tonumber(this_panel_character) then
+      this_panel_color = panel_color_to_number[this_panel_character]
+    elseif this_panel_character >= "A" and this_panel_character <= "Z" then
       if metal_panels_this_row > 0 then
         this_panel_color = 8
       else
-        this_panel_color = panel_color_to_number[this_panel_color]
+        this_panel_color = panel_color_to_number[this_panel_character]
       end
-    elseif this_panel_color >= "a" and this_panel_color <= "z" then
+    elseif this_panel_character >= "a" and this_panel_character <= "z" then
       if metal_panels_this_row > 1 then
         this_panel_color = 8
       else
-        this_panel_color = panel_color_to_number[this_panel_color]
+        this_panel_color = panel_color_to_number[this_panel_character]
       end
     end
-    panel.color = this_panel_color + 0
+    panel.color = this_panel_color
     panel.state = "dimmed"
   end
   self.panel_buffer = string.sub(self.panel_buffer, 7)

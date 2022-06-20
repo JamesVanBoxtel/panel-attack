@@ -298,6 +298,14 @@ function Match.render(self)
       gprint(spectators_string, themes[config.theme].spectators_Pos[1], themes[config.theme].spectators_Pos[2])
     end
 
+    local overtimeXLocation = 180
+    local overtimeYLocation = 10
+    if P1.CLOCK >= Stack.superOvertimeStartFrame then
+      draw(themes[config.theme].images.IMG_superOvertime, overtimeXLocation, overtimeYLocation, nil, 1 / GFX_SCALE, 1 / GFX_SCALE)
+    elseif P1.CLOCK >= Stack.overtimeStartFrame then
+      draw(themes[config.theme].images.IMG_overtime, overtimeXLocation, overtimeYLocation, nil, 1 / GFX_SCALE, 1 / GFX_SCALE)
+    end
+
     if match_type == "Ranked" then
       if global_current_room_ratings and global_current_room_ratings[my_player_number] and global_current_room_ratings[my_player_number].new then
         local rating_to_print = loc("ss_rating") .. "\n"
