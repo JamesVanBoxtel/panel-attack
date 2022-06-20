@@ -2079,8 +2079,8 @@ function Stack.gameResult(self)
   return nil
 end
 
-Stack.overtimeStartFrame = 60 * (60 + 3)
-Stack.superOvertimeStartFrame = 60 * (120 + 3)
+Stack.overtimeStartFrame = 60 * (10 + 3)
+Stack.superOvertimeStartFrame = 60 * (20 + 3)
 
 function Stack:currentOvertimeLevel()
   if self.CLOCK >= Stack.superOvertimeStartFrame then
@@ -2441,7 +2441,7 @@ function Stack.check_matches(self)
             -- Super Overtime:
             -- This has gone long enough, someone needs to die.
             -- Include a second shock panel per garbage block.
-            this_panel_color = 8
+            this_panel_color = 7
           elseif currentOvertimeLevel > 0 and this_panel_character >= "a" and this_panel_character <= "z" then
             -- Basic Overtime:
             -- Include one shock panel per garbage row.
