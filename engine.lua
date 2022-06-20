@@ -2079,8 +2079,8 @@ function Stack.gameResult(self)
   return nil
 end
 
-Stack.overtimeStartFrame = 60 * (10 + 3)
-Stack.superOvertimeStartFrame = 60 * (20 + 3)
+Stack.overtimeStartFrame = 60 * (30 + 3)
+Stack.superOvertimeStartFrame = 60 * (60 + 3)
 
 function Stack:currentOvertimeLevel()
   if self.CLOCK >= Stack.superOvertimeStartFrame then
