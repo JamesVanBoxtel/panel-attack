@@ -2596,7 +2596,7 @@ function Stack.check_matches(self)
       end
       local currentOvertimeLevel = self:currentOvertimeLevel()
       if currentOvertimeLevel > 1 then
-        stop_time = 0.75 * stop_time
+        stop_time = math.floor(0.75 * stop_time)
       end
       self.stop_time = max(self.stop_time, stop_time)
       self.pre_stop_time = max(self.pre_stop_time, pre_stop_time)
