@@ -223,6 +223,18 @@ function stages_init()
   end
 end
 
+-- for reloading the graphics if the window was resized
+function stages_reload_graphics()
+  -- reload the current stage graphics immediately
+  stages[current_stage]:graphics_init(true, false)
+  -- lazy load the rest
+  for _, stage in pairs(stages) do
+    if stage.id ~= current_stage then
+      stage:graphics_init(false, true)
+    end
+  end
+end
+
 -- whether or not a stage is part of a bundle or not
 function Stage.is_bundle(self)
   return #self.sub_stages > 1

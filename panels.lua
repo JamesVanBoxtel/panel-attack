@@ -81,6 +81,26 @@ function panels_init()
   end
 end
 
+-- -- for reloading the graphics if the window was resized
+-- function panels_reload_graphics()
+--   local panelsIds = shallowcpy(panels_ids)
+--   -- reload the current panel graphics immediately
+--   config.panels:graphics_init(true, false)
+--   table.remove(panelsIds, config.panels.id)
+--   if P1.panels_dir then
+--     characters[P1.panels_dir]:graphics_init(true, false)
+--     table.remove(panelsIds, P1.panels_dir)
+--   end
+--   if P2.panels_dir then
+--     characters[P2.panels_dir]:graphics_init(true, false)
+--     table.remove(panelsIds, P2.panels_dir)
+--   end
+--   -- lazy load the rest
+--   for i = 1, #panelsIds do
+--     panels[panelsIds[i]]:graphics_init(false, true)
+--   end
+-- end
+
 function Panels.load(self)
   logger.debug("loading panels " .. self.id)
 
