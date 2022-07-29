@@ -392,8 +392,10 @@ end
 function characters_reload_graphics()
   local characterIds = shallowcpy(characters_ids_for_current_theme)
   -- reload the current character graphics immediately
-  characters[config.character]:graphics_init(true, false)
-  table.remove(characterIds, config.character.id)
+  if characters[config.character] then
+    characters[config.character]:graphics_init(true, false)
+    table.remove(characterIds, config.character.id)
+  end
   if P1 and P1.character then
     characters[P1.character]:graphics_init(true, false)
     table.remove(characterIds, P1.character)

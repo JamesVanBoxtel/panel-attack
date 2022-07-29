@@ -226,7 +226,9 @@ end
 -- for reloading the graphics if the window was resized
 function stages_reload_graphics()
   -- reload the current stage graphics immediately
-  stages[current_stage]:graphics_init(true, false)
+  if stages[current_stage] then
+    stages[current_stage]:graphics_init(true, false)
+  end
   -- lazy load the rest
   for _, stage in pairs(stages) do
     if stage.id ~= current_stage then
