@@ -1650,9 +1650,9 @@ function Stack.simulate(self)
       end
     end
 
-    if (self.score > 99999) then
+    if (self.score > 99999 and score_mode ~= SCOREMODE_PA) then
       self.score = 99999
-    -- lol owned
+      -- lol owned
     end
 
     self.n_prev_active_panels = self.n_active_panels
@@ -2516,6 +2516,13 @@ function Stack.check_matches(self)
         else
           self.score = self.score + 20400 + ((combo_size - 40) * 800)
         end
+      elseif (score_mode == SCOREMODE_PA) then
+        if combo_size > 3 then
+          local comboConstant = 400
+          local comboMultipler = 40
+          local comboScore = combo_size * comboMultipler + comboConstant
+          self.score = self.score + comboScore
+        end
       end
 
       self:enqueue_card(false, first_panel_col, first_panel_row, combo_size)
@@ -2554,7 +2561,16 @@ function Stack.check_matches(self)
         chain_bonus = 0
       end
       self.score = self.score + score_chain_TA[chain_bonus]
+    elseif score_mode == SCOREMODE_PA then
+      if chain_bonus > 0 then
+        local chainConstant = 400
+        local chainComboMultipler = 1
+        local chainComboConstant = 60
+        local chainScore = (combo_size + chainComboConstant) * chainComboMultipler * chain_bonus + chainConstant
+        self.score = self.score + chainScore
+      end
     end
+
     if ((combo_size > 3) or is_chain) then
       local stop_time
       if self.panels_in_top_row and is_chain then

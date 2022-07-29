@@ -11,7 +11,7 @@ this_frame_messages = {}
 
 server_queue = ServerQueue()
 
-score_mode = SCOREMODE_TA
+score_mode = SCOREMODE_PA
  
 GARBAGE_TELEGRAPH_TIME = 45 -- the amount of time the garbage stays in the telegraph after getting there from the attack animation
 GARBAGE_DELAY_LAND_TIME = 60 -- this is the amount of time after garbage leaves the telegraph before it can land on the opponent

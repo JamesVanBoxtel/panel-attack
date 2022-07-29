@@ -62,7 +62,8 @@ danger_bounce_table = {1, 1, 1,
                        4, 4, 4}
 
 SCOREMODE_TA    = 1
-SCOREMODE_PDP64 = 2 -- currently not used
+SCOREMODE_PDP64 = 2
+SCOREMODE_PA = 3
 
 -- score lookup tables
 score_combo_PdP64 = {} --size 40
