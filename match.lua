@@ -99,6 +99,12 @@ function Match.run(self)
     P2:send_controls()
   end
 
+  if retry_input(1) and P1.CLOCK > 60 then
+    P1:rollbackToFrame(P1.CLOCK - 60)
+    P1.input_buffer = ""
+    P1.confirmedInput = string.sub(P1.confirmedInput, 1, P1.CLOCK+1)
+  end
+
   local ranP1 = true
   local ranP2 = true
   local runsSoFar = 0

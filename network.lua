@@ -294,7 +294,7 @@ function Stack.send_controls(self)
   waitClock = waitClock + 1
 
   if GAME.TASMode then
-    if playerDidInput(playerNumber) == false and waitClock % 2 ~= 0 then
+    if playerDidInput(playerNumber) == false and waitClock % 1 ~= 0 then
       return
     end
   end

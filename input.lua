@@ -622,10 +622,18 @@ player_right_once =
   nil
 )
 
+retry_input =
+  input_key_func(
+  {},
+  {"taunt_down"},
+  normal_key,
+  nil
+)
+
 advance_input =
   input_key_func(
   {},
-  {"taunt_up", "taunt_down"},
+  {"taunt_up"},
   repeating_key,
   nil
 )
@@ -637,7 +645,8 @@ function playerDidInput(playerNumber)
      player_down_once(playerNumber) or
      player_left_once(playerNumber) or
      player_right_once(playerNumber) or
-     advance_input(playerNumber) then
+     advance_input(playerNumber) or
+     retry_input(playerNumber) then
        return true
   end
 

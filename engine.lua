@@ -500,11 +500,11 @@ function Stack.saveForRollback(self)
   self.prev_states = prev_states
   self.garbage_target = garbage_target
 
-  local deleteFrame = self.CLOCK - MAX_LAG - 1
-  if prev_states[deleteFrame] then
-    clone_pool[#clone_pool + 1] = prev_states[deleteFrame]
-    prev_states[deleteFrame] = nil
-  end
+  -- local deleteFrame = self.CLOCK - MAX_LAG - 1
+  -- if prev_states[deleteFrame] then
+  --   clone_pool[#clone_pool + 1] = prev_states[deleteFrame]
+  --   prev_states[deleteFrame] = nil
+  -- end
 end
 
 function Stack.set_garbage_target(self, new_target)
