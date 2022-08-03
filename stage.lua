@@ -1,11 +1,13 @@
 require("stage_loader")
 local logger = require("logger")
+require("UpdatingImage")
 
 -- Stuff defined in this file:
 --  . the data structure that store a stage's data
 
 local basic_images = {"thumbnail"}
-local other_images = {"background"}
+local backgroundImageName = "background"
+local other_images = {backgroundImageName}
 local defaulted_images = {thumbnail = true, background = true} -- those images will be defaulted if missing
 local basic_musics = {}
 local other_musics = {"normal_music", "danger_music", "normal_music_start", "danger_music_start"}
@@ -208,7 +210,7 @@ function stages_init()
 
   -- fix config stage if it's missing
   if not config.stage or (config.stage ~= random_stage_special_value and not stages[config.stage]) then
-    config.stage = uniformly(stages_ids_for_current_theme) -- it's legal to pick a bundle here, no need to go further
+    config.stage = table.getRandomElement(stages_ids_for_current_theme) -- it's legal to pick a bundle here, no need to go further
   end
 
   -- actual init for all stages, starting with the default one
@@ -221,6 +223,20 @@ function stages_init()
   end
 end
 
+-- for reloading the graphics if the window was resized
+function stages_reload_graphics()
+  -- reload the current stage graphics immediately
+  if stages[current_stage] then
+    stages[current_stage]:graphics_init(true, false)
+  end
+  -- lazy load the rest
+  for _, stage in pairs(stages) do
+    if stage.id ~= current_stage then
+      stage:graphics_init(false, false)
+    end
+  end
+end
+
 -- whether or not a stage is part of a bundle or not
 function Stage.is_bundle(self)
   return #self.sub_stages > 1
@@ -230,7 +246,7 @@ end
 function Stage.graphics_init(self, full, yields)
   local stage_images = full and other_images or basic_images
   for _, image_name in ipairs(stage_images) do
-    self.images[image_name] = load_img_from_supported_extensions(self.path .. "/" .. image_name)
+    self.images[image_name] = GraphicsUtil.loadImageFromSupportedExtensions(self.path .. "/" .. image_name)
     if not self.images[image_name] and defaulted_images[image_name] and not self:is_bundle() then
       self.images[image_name] = default_stage.images[image_name]
       if not self.images[image_name] then

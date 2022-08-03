@@ -1,5 +1,6 @@
 require("graphics_util")
 require("sound_util")
+local logger = require("logger")
 
 local musics = {"main", "select_screen", "main_start", "select_screen_start"} -- the music used in a theme
 
@@ -18,10 +19,13 @@ local flags = {
 }
 
 -- loads the image of the given name
-local function load_theme_img(name)
-  local img = load_img_from_supported_extensions("themes/" .. config.theme .. "/" .. name)
-  if not img then
-    img = load_img_from_supported_extensions("themes/" .. default_theme_dir .. "/" .. name)
+local function load_theme_img(name, useBackup)
+  if useBackup == nil then
+    useBackup = true
+  end
+  local img = GraphicsUtil.loadImageFromSupportedExtensions("themes/" .. config.theme .. "/" .. name)
+  if not img and useBackup then
+    img = GraphicsUtil.loadImageFromSupportedExtensions("themes/" .. default_theme_dir .. "/" .. name)
   end
   return img
 end
@@ -33,6 +37,7 @@ Theme =
     self.images = {} -- theme images
     self.sounds = {} -- theme sfx
     self.musics = {} -- theme music
+    self.font = {} -- font
     self.matchtypeLabel_Pos = {-40, -30} -- the position of the "match type" label
     self.matchtypeLabel_Scale = 3 -- the scale size of the "match type" lavel
     self.timeLabel_Pos = {0, 10} -- the position of the timer label
@@ -96,10 +101,24 @@ Theme =
     self.multibar_Pos = {-13, 96} -- the position of the multibar
     self.multibar_Scale = 1 -- the scale size of the multibar
     self.multibar_is_absolute = false -- if the multibar should render in absolute scale
+    self.bg_title_is_tiled = false -- if the image should tile (default is stretch)
+    self.bg_title_speed_x = 0 -- speed the various backgrounds move at
+    self.bg_title_speed_y = 0
+    self.bg_main_is_tiled = false -- if the image should tile (default is stretch)
+    self.bg_main_speed_x = 0
+    self.bg_main_speed_y = 0
+    self.bg_select_screen_is_tiled = false -- if the image should tile (default is stretch)
+    self.bg_select_screen_speed_x = 0
+    self.bg_select_screen_speed_y = 0
+    self.bg_readme_is_tiled = false -- if the image should tile (default is stretch)
+    self.bg_readme_speed_x = 0
+    self.bg_readme_speed_y = 0
+    self.main_menu_screen_pos = {0, 0} -- the top center position of most menus
+    self.main_menu_y_max = 0
+    self.main_menu_max_height = 0
+    self.main_meny_y_center = 0
   end
 )
-
-GAME.backgroundImage = load_theme_img("background/main")
 
 function Theme.graphics_init(self)
   self.images = {}
@@ -108,10 +127,6 @@ function Theme.graphics_init(self)
   for _, flag in ipairs(flags) do
     self.images.flags[flag] = load_theme_img("flags/" .. flag)
   end
-
-  self.images.bg_main = load_theme_img("background/main")
-  self.images.bg_select_screen = load_theme_img("background/select_screen")
-  self.images.bg_readme = load_theme_img("background/readme")
 
   self.images.bg_overlay = load_theme_img("background/bg_overlay")
   self.images.fg_overlay = load_theme_img("background/fg_overlay")
@@ -187,8 +202,13 @@ function Theme.graphics_init(self)
   self.images.IMG_random_stage = load_theme_img("random_stage")
   self.images.IMG_random_character = load_theme_img("random_character")
 
-  self.images.IMG_healthbar_frame_1P = load_theme_img("healthbar_frame_1P")
-  self.images.IMG_healthbar_frame_2P = load_theme_img("healthbar_frame_2P")
+  if self.multibar_is_absolute then
+    self.images.IMG_healthbar_frame_1P = load_theme_img("healthbar_frame_1P_absolute")
+    self.images.IMG_healthbar_frame_2P = load_theme_img("healthbar_frame_2P_absolute")
+  else
+    self.images.IMG_healthbar_frame_1P = load_theme_img("healthbar_frame_1P")
+    self.images.IMG_healthbar_frame_2P = load_theme_img("healthbar_frame_2P")
+  end
   self.images.IMG_healthbar = load_theme_img("healthbar")
 
   self.images.IMG_prestop_frame = load_theme_img("prestop_frame")
@@ -204,6 +224,8 @@ function Theme.graphics_init(self)
   self.images.IMG_multibar_prestop_bar = load_theme_img("multibar_prestop_bar")
   self.images.IMG_multibar_stop_bar = load_theme_img("multibar_stop_bar")
   self.images.IMG_multibar_shake_bar = load_theme_img("multibar_shake_bar")
+
+  self.images.IMG_bug = load_theme_img("bug")
 
   --play field frames, plus the wall at the bottom.
   self.images.IMG_frame1P = load_theme_img("frame/frame1P")
@@ -252,11 +274,27 @@ function Theme.graphics_init(self)
   self.images.IMG_cursor = {}
   for player_num = 1, MAX_SUPPORTED_PLAYERS do
     self.images.IMG_players[player_num] = load_theme_img("p" .. player_num)
-    self.images.IMG_cursor[player_num] = load_theme_img("p" .. player_num .. "_cursor")
     self.images.IMG_char_sel_cursors[player_num] = {}
     for position_num = 1, 2 do
       self.images.IMG_char_sel_cursors[player_num][position_num] = load_theme_img("p" .. player_num .. "_select_screen_cursor" .. position_num)
     end
+  end
+
+  -- Cursor animation is 2 frames
+  for i = 1, 2 do
+    -- Cursor images used to be named weird and make modders think they were for different players
+    -- Load either format from the custom theme, and fallback to the built in cursor otherwise.
+    local cursorImage = load_theme_img("cursor" .. i, false)
+    local legacyCursorImage = load_theme_img("p" .. i .. "_cursor", false)
+    if not cursorImage then
+      if legacyCursorImage then
+        cursorImage = legacyCursorImage
+      else
+        cursorImage = load_theme_img("cursor" .. i, true)
+      end
+    end
+    assert(cursorImage ~= nil)
+    self.images.IMG_cursor[i] = cursorImage
   end
 
   self.images.IMG_char_sel_cursor_halves = {left = {}, right = {}}
@@ -272,6 +310,15 @@ function Theme.graphics_init(self)
       local cur_width, cur_height = self.images.IMG_char_sel_cursors[player_num][position_num]:getDimensions()
       local half_width, half_height = cur_width / 2, cur_height / 2
       self.images.IMG_char_sel_cursor_halves.right[player_num][position_num] = love.graphics.newQuad(half_width, 0, half_width, cur_height, cur_width, cur_height)
+    end
+  end
+
+  self.font.size = themes[config.theme].font.size or 12
+  for key, value in pairs(love.filesystem.getDirectoryItems("themes/" .. config.theme)) do
+    if value:lower():match(".*%.ttf") then -- Any .ttf file
+      self.font.path = "themes/" .. config.theme .. "/" .. value
+      set_global_font(self.font.path, self.font.size)
+      break
     end
   end
 end
@@ -663,15 +710,91 @@ function Theme.json_init(self)
   if read_data.multibar_is_absolute and type(read_data.multibar_is_absolute) == "boolean" then
     self.multibar_is_absolute = read_data.multibar_is_absolute
   end
+
+  -- Font size
+  if read_data.font_size and type(read_data.font_size) == "number" then
+    self.font.size = read_data.font_size
+  end
+  
+  -- Background Speeds
+  if read_data.bg_title_speed_x and type(read_data.bg_title_speed_x) == "number" then
+    self.bg_title_speed_x = read_data.bg_title_speed_x
+  end
+  if read_data.bg_title_speed_y and type(read_data.bg_title_speed_y) == "number" then
+    self.bg_title_speed_y = read_data.bg_title_speed_y
+  end
+
+  if read_data.bg_main_speed_x and type(read_data.bg_main_speed_x) == "number" then
+    self.bg_main_speed_x = read_data.bg_main_speed_x
+  end
+  if read_data.bg_main_speed_y and type(read_data.bg_main_speed_y) == "number" then
+    self.bg_main_speed_y = read_data.bg_main_speed_y
+  end
+
+  if read_data.bg_select_screen_speed_x and type(read_data.bg_select_screen_speed_x) == "number" then
+    self.bg_select_screen_speed_x = read_data.bg_select_screen_speed_x
+  end
+  if read_data.bg_select_screen_speed_y and type(read_data.bg_select_screen_speed_y) == "number" then
+    self.bg_select_screen_speed_y = read_data.bg_select_screen_speed_y
+  end
+
+  if read_data.bg_readme_speed_x and type(read_data.bg_readme_speed_x) == "number" then
+    self.bg_readme_speed_x = read_data.bg_readme_speed_x
+  end
+  if read_data.bg_readme_speed_y and type(read_data.bg_readme_speed_y) == "number" then
+    self.bg_readme_speed_y = read_data.bg_readme_speed_y
+  end
+
+  if read_data.bg_title_is_tiled and type(read_data.bg_title_is_tiled) == "boolean" then
+    self.bg_title_is_tiled = read_data.bg_title_is_tiled
+  end
+  if read_data.bg_main_is_tiled and type(read_data.bg_main_is_tiled) == "boolean" then
+    self.bg_main_is_tiled = read_data.bg_main_is_tiled
+  end
+  if read_data.bg_select_screen_is_tiled and type(read_data.bg_select_screen_is_tiled) == "boolean" then
+    self.bg_select_screen_is_tiled = read_data.bg_select_screen_is_tiled
+  end
+  if read_data.bg_readme_is_tiled and type(read_data.bg_readme_is_tiled) == "boolean" then
+    self.bg_readme_is_tiled = read_data.bg_readme_is_tiled
+  end
+
+end
+
+function Theme:final_init()
+
+  local titleImage = load_theme_img("background/title", false)
+  if titleImage then
+    self.images.bg_title = UpdatingImage(titleImage, self.bg_title_is_tiled, self.bg_title_speed_x, self.bg_title_speed_y, canvas_width, canvas_height)
+  end
+
+  self.images.bg_main = UpdatingImage(load_theme_img("background/main"), self.bg_main_is_tiled, self.bg_main_speed_x, self.bg_main_speed_y, canvas_width, canvas_height)
+  self.images.bg_select_screen = UpdatingImage(load_theme_img("background/select_screen"), self.bg_select_screen_is_tiled, self.bg_select_speed_x, self.bg_select_speed_y, canvas_width, canvas_height)
+  self.images.bg_readme = UpdatingImage(load_theme_img("background/readme"), self.bg_readme_is_tiled, self.bg_readme_speed_x, self.bg_readme_speed_y, canvas_width, canvas_height)
+
+  local menuYPadding = 10
+  self.centerMenusVertically = true
+  if themes[config.theme].images.bg_title then
+    menuYPadding = 100
+    self.main_menu_screen_pos = {532, menuYPadding}
+    self.main_menu_y_max = canvas_height - menuYPadding
+  else
+    self.main_menu_screen_pos = {532, 249}
+    self.main_menu_y_max = canvas_height - menuYPadding
+    self.centerMenusVertically = false
+  end
+  self.main_menu_max_height = (self.main_menu_y_max - self.main_menu_screen_pos[2])
+  self.main_menu_y_center = self.main_menu_screen_pos[2] + (self.main_menu_max_height / 2)
+
 end
 
 -- loads a theme into the game
 function Theme.load(self, id)
-  print("loading theme " .. id)
+  logger.debug("loading theme " .. id)
+  self:json_init()
   self:graphics_init()
   self:sound_init()
-  self:json_init()
-  print("loaded theme " .. id)
+  self:final_init()
+  logger.debug("loaded theme " .. id)
 end
 
 -- initializes a theme

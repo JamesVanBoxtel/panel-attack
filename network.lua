@@ -65,6 +65,12 @@ function get_message()
 end
 
 local lag_q = Queue() -- only used for debugging
+local lastSendTime = nil
+local minLagSeconds = 0
+local maxLagSeconds = 1
+local lagIncrease = 1
+local lagSeconds = minLagSeconds
+local lagCount = 0
 
 -- send the given message through
 function net_send(...)
@@ -74,9 +80,20 @@ function net_send(...)
   if not STONER_MODE then
     TCP_sock:send(...)
   else
+    if lastSendTime == nil then
+      lastSendTime = love.timer.getTime()
+    end
     lag_q:push({...})
-    if lag_q:len() == 70 then
-      TCP_sock:send(unpack(lag_q:pop()))
+    local currentTime = love.timer.getTime()
+    local timeDifference = currentTime - lastSendTime
+    if timeDifference > lagSeconds then
+      while lag_q:len() > 0 do
+        TCP_sock:send(unpack(lag_q:pop()))
+      end
+      lagSeconds = (math.random() * (maxLagSeconds - minLagSeconds)) + minLagSeconds
+      lagCount = lagCount + 1
+      lagSeconds = lagSeconds + (lagIncrease * lagCount)
+      lastSendTime = love.timer.getTime()
     end
   end
   return true
@@ -95,6 +112,9 @@ function undo_stonermode()
   while lag_q:len() ~= 0 do
     TCP_sock:send(unpack(lag_q:pop()))
   end
+  lastSendTime = nil
+  lagCount = 0
+  lagSeconds = minLagSeconds
   STONER_MODE = false
 end
 
@@ -215,6 +235,7 @@ function network_init(ip, network_port)
     --error(loc("nt_conn_timeout"))
     return false
   end
+  TCP_sock:setoption("tcp-nodelay", true)
   TCP_sock:settimeout(0)
   got_H = false
   net_send("H" .. VERSION)
@@ -232,6 +253,19 @@ function network_init(ip, network_port)
   }
   sent_json.character_display_name = sent_json.character_is_random and "" or characters[config.character].display_name
   json_send(sent_json)
+  return true
+end
+
+function send_error_report(errorData)
+  TCP_sock = socket.tcp()
+  TCP_sock:settimeout(7)
+  if not TCP_sock:connect("18.188.43.50", 59569) then --for official server
+    return false
+  end
+  TCP_sock:settimeout(0)
+  local errorFull = { error_report = errorData }
+  json_send(errorFull)
+  close_socket()
   return true
 end
 
@@ -288,13 +322,19 @@ end
 
 local waitClock = 0
 function Stack.send_controls(self)
-  
+
+  if self.is_local and TCP_sock and string.len(self.confirmedInput) > 0 and self.garbage_target and string.len(self.garbage_target.confirmedInput) == 0 then
+    -- Send 1 frame at CLOCK time 0 then wait till we get our first input from the other player.
+    -- This will cause a player that got the start message earlierer than the other player to wait for the other player just once.
+    return
+  end
+
   local playerNumber = self.which
 
   waitClock = waitClock + 1
 
   if GAME.TASMode then
-    if playerDidInput(playerNumber) == false and waitClock % 1 ~= 0 then
+    if playerDidInput(playerNumber) == false and waitClock % GAME.TASSpeed ~= 0 then
       return
     end
   end

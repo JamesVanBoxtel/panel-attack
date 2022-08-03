@@ -1,15 +1,13 @@
-
 require("util")
+require("table_util")
 
 -- The values in this file are constants (except in this file perhaps) and are expected never to change during the game, not to be confused with globals!
 VERSION = "046"
 
 canvas_width = 1280
 canvas_height = 720
-legacy_canvas_width = 816
-legacy_canvas_height = 612
 
-global_background_color = { 0.1, 0.1, 0.1 }
+global_background_color = { 0.0, 0.0, 0.0 }
 
 mouse_pointer_timeout = 1.5 --seconds
 RATING_SPREAD_MODIFIER = 400 -- rating players must be within to play ranked
@@ -34,6 +32,11 @@ default_stages_folders = {"cave", "fire", "flower", "forest", "ice",
 
 random_stage_special_value = "__RandomStage"
 random_character_special_value = "__RandomCharacter"
+
+default_input_repeat_delay = 20
+
+large_font = 10 -- large font base+10
+small_font = -3 -- small font base-3
 
 key_names = {"up", "down", "left", "right", "swap1",
   "swap2", "taunt_up", "taunt_down", "raise1", "raise2", "pause"}
@@ -106,7 +109,7 @@ difficulty_to_ncolors_1Ptime = {6,6,6,6}
 
 time_attack_time = 120
 -- Yes, 2 is slower than 1 and 50..99 are the same.
-speed_to_rise_time = map(function(x) return x/16 end,
+speed_to_rise_time = table.map(
    {942, 983, 838, 790, 755, 695, 649, 604, 570, 515,
     474, 444, 394, 370, 347, 325, 306, 289, 271, 256,
     240, 227, 213, 201, 189, 178, 169, 158, 148, 138,
@@ -116,7 +119,8 @@ speed_to_rise_time = map(function(x) return x/16 end,
      47,  47,  47,  47,  47,  47,  47,  47,  47,  47,
      47,  47,  47,  47,  47,  47,  47,  47,  47,  47,
      47,  47,  47,  47,  47,  47,  47,  47,  47,  47,
-     47,  47,  47,  47,  47,  47,  47,  47,  47})
+     47,  47,  47,  47,  47,  47,  47,  47,  47},
+     function(x) return x/16 end)
 
 -- endless and 1P time attack use a speed system in which
 -- speed increases based on the number of panels you clear.
