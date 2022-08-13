@@ -29,8 +29,10 @@ local puzzle_menu_last_index = 3
 function fmainloop()
   Localization.init(localization)
   copy_file("readme_puzzles.txt", "puzzles/README.txt")
+  if love.system.getOS() ~= "OS X" then
+    recursiveRemoveFiles(".", ".DS_Store")
+  end
   theme_init()
-
   -- stages and panels before characters since they are part of their loading!
   GAME:drawLoadingString(loc("ld_stages"))
   wait()
@@ -313,7 +315,8 @@ end
 function Stack.wait_for_random_character(self)
   if self.character == random_character_special_value then
     self.character = table.getRandomElement(characters_ids_for_current_theme)
-  elseif characters[self.character]:is_bundle() then -- may have picked a bundle
+  end
+  if characters[self.character]:is_bundle() then -- may have picked a bundle
     self.character = table.getRandomElement(characters[self.character].sub_characters)
   end
   character_loader_load(self.character)

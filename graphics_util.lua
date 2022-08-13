@@ -3,14 +3,7 @@ local logger = require("logger")
 
 
 -- Utility methods for drawing
-GraphicsUtil =
-  class(
-  function(self)
-    self.fontFile = nil
-    self.fontSize = 12
-    self.fontCache = {}
-  end
-)
+GraphicsUtil = { fontFile = nil, fontSize = 12, fontCache = {} }
 
 function GraphicsUtil.privateLoadImage(path_and_name)
   local image = nil
@@ -41,7 +34,7 @@ function GraphicsUtil.privateLoadImageWithExtensionAndScale(pathAndName, extensi
       -- We would like to use linear for shrinking and nearest for growing,
       -- but there is a bug in some drivers that doesn't allow for min and mag to be different
       -- to work around this, calculate if we are shrinking or growing and use the right filter on both.
-      if GAME.canvasXScale > scale then
+      if GAME.canvasXScale >= scale then
         result:setFilter("nearest", "nearest")
       else
         result:setFilter("linear", "linear")
@@ -367,7 +360,7 @@ end
 local function privateMakeFont(fontPath, size)
   local f
   local hinting = "normal"
-  local dpi = GAME.canvasXScale
+  local dpi = GAME:newCanvasSnappedScale()
   if fontPath then
     f = love.graphics.newFont(fontPath, size, hinting, dpi)
   else
