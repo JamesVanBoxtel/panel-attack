@@ -14,6 +14,7 @@ Game =
     self.gameIsPaused = false -- game can be paused while playing on local
     self.renderDuringPause = false -- if the game can render when you are paused
     self.TASMode = true
+    self.TASIdles = 5 -- the amount of idle inputs after player input before the player can input again
     self.TASSpeed = 10000000 -- this many ticks the game will proceed anyways, go really hide to avoid that
     self.rewindAllowed = true
     self.currently_paused_tracks = {} -- list of tracks currently paused

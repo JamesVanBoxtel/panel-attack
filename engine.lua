@@ -165,6 +165,7 @@ Stack =
     s.taunt_down = nil -- will hold an index
     s.taunt_queue = Queue()
 
+    s.framesSinceInput = 0
     s.cur_wait_time = config.input_repeat_delay -- number of ticks to wait before the cursor begins
     -- to move quickly... it's based on P1CurSensitivity
     s.cur_timer = 0 -- number of ticks for which a new direction's been pressed

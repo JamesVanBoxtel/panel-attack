@@ -333,12 +333,6 @@ function Stack.send_controls(self)
 
   waitClock = waitClock + 1
 
-  if GAME.TASMode then
-    if playerDidInput(playerNumber) == false and waitClock % GAME.TASSpeed ~= 0 then
-      return
-    end
-  end
-
   local to_send = base64encode[
     (player_raise(playerNumber) and 32 or 0) + 
     (player_swap(playerNumber) and 16 or 0) + 
@@ -347,6 +341,20 @@ function Stack.send_controls(self)
     (player_left_once(playerNumber) and 2 or 0) + 
     (player_right_once(playerNumber) and 1 or 0) + 1
     ]
+
+  if GAME.TASMode then
+    if self.framesSinceInput < GAME.TASIdles then
+      -- The player isn't allowed inputs until TAS Idle count is reached
+      to_send = self:idleInput()
+      self.framesSinceInput = self.framesSinceInput + 1
+    elseif self.framesSinceInput < GAME.TASSpeed then
+      -- If the player didn't do input in TAS mode we won't advance.
+      if playerDidInput(playerNumber) == false then
+        return
+      end
+    end
+  end
+
 
   if TCP_sock then
     net_send("I" .. to_send)
@@ -357,4 +365,8 @@ function Stack.send_controls(self)
   end
 
   self:receiveConfirmedInput(to_send)
+  
+  if to_send ~= self:idleInput() then
+    self.framesSinceInput = 0
+  end
 end
