@@ -60,43 +60,11 @@ function replay_browser.main()
       end
       replay_browser.current_path = new_path
     end
-    replay_browser.path_contents = get_directory_contents(replay_browser.base_path .. replay_browser.current_path)
+    replay_browser.path_contents = FileUtil.getFilteredDirectoryItems(replay_browser.base_path .. replay_browser.current_path)
   end
 
   local function replay_browser_go_up()
     replay_browser_update(replay_browser.current_path:gsub("(.*/).*/$", "%1"))
-  end
-
-  local function replay_browser_load_details(path)
-    replay_browser.filename = path
-    local file, error_msg = love.filesystem.read(replay_browser.filename)
-
-    if file == nil then
-      print(loc("rp_browser_error_loading", error_msg))
-      return false
-    end
-
-    replay = {}
-    replay = json.decode(file)
-    if not replay.engineVersion then
-      replay.engineVersion = "045"
-    end
-
-    -- Old versions saved replays with extra data, prefer vs and endless in that case
-    if replay.vs and replay.endless then
-      replay.endless = nil
-    end
-    if replay.vs and replay.puzzle then
-      replay.puzzle = nil
-    end
-    if replay.endless and replay.puzzle then
-      replay.puzzle = nil
-    end
-
-    if type(replay.in_buf) == "table" then
-      replay.in_buf = table.concat(replay.in_buf)
-    end
-    return true
   end
 
   local function replay_browser_select()
@@ -107,14 +75,15 @@ function replay_browser.main()
       local file_info = love.filesystem.getInfo(replay_browser.selection)
       if file_info then
         if file_info.type == "file" then
-          return replay_browser_load_details(replay_browser.selection)
+          replay_browser.filename = replay_browser.selection
+          return Replay.loadFromPath(replay_browser.selection)
         elseif file_info.type == "directory" then
           replay_browser_update(replay_browser.current_path .. replay_browser.path_contents[replay_browser.cursor_pos] .. "/")
         else
-          print(loc("rp_browser_error_unknown_filetype", file_info.type, replay_browser.selection))
+          --print(loc("rp_browser_error_unknown_filetype", file_info.type, replay_browser.selection))
         end
       else
-        print(loc("rp_browser_error_file_not_found", replay_browser.selection))
+        --print(loc("rp_browser_error_file_not_found", replay_browser.selection))
       end
     end
   end
@@ -169,7 +138,9 @@ function replay_browser.main()
       gprint(replay_browser.filename, replay_browser.menu_x - 150, replay_browser.menu_y - 40 + replay_browser.menu_h)
 
       if replay.vs then
-        local twoPlayerVs = replay.vs.O and string.len(replay.vs.O) > 0
+        -- This used to be calculated based on the length of "O", but that no longer always exists.
+        -- "I" will always exist for two player vs
+        local twoPlayerVs = replay.vs.I and string.len(replay.vs.I) > 0
         local modeText
         if twoPlayerVs then
           modeText = loc("rp_browser_info_2p_vs")
