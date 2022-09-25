@@ -3,7 +3,7 @@
 -- 1 small bug fix is included: to1:() returned the wrong version
 
 --http://www.glicko.net/glicko/glicko2.pdf
-local c = 173.7178 -- Used for conversion between Glicko1 and 2
+local c = 173.7178 -- Used for conversion between Glicko1 and 2, not to be confused with c from Glicko1
 local epsilon = 1e-6 -- Convergence
 
 -- Shortcuts for commonly used math functions
@@ -13,7 +13,8 @@ local log = math.log
 
 -- Glicko2
 local Glicko2 = {
-	Tau = 0.5, -- Slider for volatility
+	Tau = 0.5, -- Slider for volatility Smaller values prevent the volatility measures from changing by large
+	 		   --  amounts, which in turn prevent enormous changes in ratings based on very improbable results.
 	InitialVolatility = 0.06
 }; Glicko2.__index = Glicko2
 
@@ -297,7 +298,7 @@ function Glicko2:range(padding)
 end
 
 function Glicko2:percent(confidence)
-	confidence = math.clamp(confidence, 0, 1)
+	confidence = bound(0, confidence, 1)
 	assert(confidence < 1, "Percentage cannot be equal or greater than 1")
 
 	--This is a simple inverse erf approximation, has accuracy of +- 0.02
