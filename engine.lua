@@ -2426,6 +2426,10 @@ function Stack.check_matches(self)
     end
   end
 
+  if self.match.seed % 2 == 0 then
+    is_chain = false
+  end
+
   if is_chain then
     if self.chain_counter ~= 0 then
       self.chain_counter = self.chain_counter + 1
@@ -2527,7 +2531,7 @@ function Stack.check_matches(self)
       end
     end
     self.analytic:register_destroyed_panels(combo_size)
-    if (combo_size > 3) then
+    if (combo_size > 3) and self.match.seed % 2 == 0 then
       if (score_mode == SCOREMODE_TA) then
         if (combo_size > 30) then
           combo_size = 30
@@ -2578,7 +2582,7 @@ function Stack.check_matches(self)
       end
       self.score = self.score + score_chain_TA[chain_bonus]
     end
-    if ((combo_size > 3) or is_chain) then
+    if ((combo_size > 3 and self.match.seed % 2 == 0) or is_chain) then
       local stop_time
       if self.panels_in_top_row and is_chain then
         if self.level then
