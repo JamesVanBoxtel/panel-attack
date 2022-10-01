@@ -1,5 +1,6 @@
 require("graphics_util")
 require("sound_util")
+local logger = require("logger")
 
 local musics = {"main", "select_screen", "main_start", "select_screen_start"} -- the music used in a theme
 
@@ -18,10 +19,13 @@ local flags = {
 }
 
 -- loads the image of the given name
-local function load_theme_img(name)
-  local img = load_img_from_supported_extensions("themes/" .. config.theme .. "/" .. name)
-  if not img then
-    img = load_img_from_supported_extensions("themes/" .. default_theme_dir .. "/" .. name)
+local function load_theme_img(name, useBackup)
+  if useBackup == nil then
+    useBackup = true
+  end
+  local img = GraphicsUtil.loadImageFromSupportedExtensions("themes/" .. config.theme .. "/" .. name)
+  if not img and useBackup then
+    img = GraphicsUtil.loadImageFromSupportedExtensions("themes/" .. default_theme_dir .. "/" .. name)
   end
   return img
 end
@@ -33,6 +37,7 @@ Theme =
     self.images = {} -- theme images
     self.sounds = {} -- theme sfx
     self.musics = {} -- theme music
+    self.font = {} -- font
     self.matchtypeLabel_Pos = {-40, -30} -- the position of the "match type" label
     self.matchtypeLabel_Scale = 3 -- the scale size of the "match type" lavel
     self.timeLabel_Pos = {0, 10} -- the position of the timer label
@@ -66,40 +71,31 @@ Theme =
     self.rating_Scale = 1 -- the scale size of the rating value
     self.spectators_Pos = {547, 460} -- the position of the spectator list
     self.healthbar_frame_Pos = {-17, -4} -- the position of the healthbar frame
-    self.healthbar_frame_Scale = 3 -- the scale size of the healtbar frame
+    self.healthbar_frame_Scale = 3 -- the scale size of the healthbar frame
     self.healthbar_Pos = {-13, 148} -- the position of the healthbar
     self.healthbar_Scale = 1 -- the scale size of the healthbar
     self.healthbar_Rotate = 0 -- the rotation of the healthbar
-    self.prestop_frame_Pos = {100, 1090} -- the position of the prestop frame
-    self.prestop_frame_Scale = 1 -- the scale size of the prestop frame
-    self.prestop_bar_Pos = {110, 1097} -- the position of the prestop bar
-    self.prestop_bar_Scale = 1 -- the scale size of the prestop bar
-    self.prestop_bar_Rotate = 0 -- the rotation of the prestop bar
-    self.prestop_Pos = {120, 1105} -- the position of the prestop
-    self.prestop_Scale = 1 -- the scale size of the prestop
-    self.stop_frame_Pos = {100, 1120} -- the position of the stop bar frame
-    self.stop_frame_Scale = 1 -- the scale size of the stop bar frame
-    self.stop_bar_Pos = {110, 1127} -- the position of the stop bar
-    self.stop_bar_Scale = 1 -- the scale size of the stop bar
-    self.stop_bar_Rotate = 0 -- the rotation of the stop bar
-    self.stop_Pos = {120, 1135} -- the position of the stop
-    self.stop_Scale = 1 -- the scale size of the stop
-    self.shake_frame_Pos = {100, 1150} -- the position of the shake bar frame
-    self.shake_frame_Scale = 1 -- the scale size of the shake bar frame
-    self.shake_bar_Pos = {110, 1157} -- the position of the shake bar
-    self.shake_bar_Scale = 1 -- the scale size of the shake bar
-    self.shake_bar_Rotate = 0 -- the rotation of the shake bar
-    self.shake_Pos = {120, 1165} -- the position of the shake
-    self.shake_Scale = 1 -- the scale size of the shake
-    self.multibar_frame_Pos = {100, 1100} -- the position of the multibar frame
-    self.multibar_frame_Scale = 1 -- the scale size of the multibar
     self.multibar_Pos = {-13, 96} -- the position of the multibar
     self.multibar_Scale = 1 -- the scale size of the multibar
     self.multibar_is_absolute = false -- if the multibar should render in absolute scale
+    self.bg_title_is_tiled = false -- if the image should tile (default is stretch)
+    self.bg_title_speed_x = 0 -- speed the various backgrounds move at
+    self.bg_title_speed_y = 0
+    self.bg_main_is_tiled = false -- if the image should tile (default is stretch)
+    self.bg_main_speed_x = 0
+    self.bg_main_speed_y = 0
+    self.bg_select_screen_is_tiled = false -- if the image should tile (default is stretch)
+    self.bg_select_screen_speed_x = 0
+    self.bg_select_screen_speed_y = 0
+    self.bg_readme_is_tiled = false -- if the image should tile (default is stretch)
+    self.bg_readme_speed_x = 0
+    self.bg_readme_speed_y = 0
+    self.main_menu_screen_pos = {0, 0} -- the top center position of most menus
+    self.main_menu_y_max = 0
+    self.main_menu_max_height = 0
+    self.main_meny_y_center = 0
   end
 )
-
-GAME.backgroundImage = load_theme_img("background/main")
 
 function Theme.graphics_init(self)
   self.images = {}
@@ -108,10 +104,6 @@ function Theme.graphics_init(self)
   for _, flag in ipairs(flags) do
     self.images.flags[flag] = load_theme_img("flags/" .. flag)
   end
-
-  self.images.bg_main = load_theme_img("background/main")
-  self.images.bg_select_screen = load_theme_img("background/select_screen")
-  self.images.bg_readme = load_theme_img("background/readme")
 
   self.images.bg_overlay = load_theme_img("background/bg_overlay")
   self.images.fg_overlay = load_theme_img("background/fg_overlay")
@@ -187,44 +179,27 @@ function Theme.graphics_init(self)
   self.images.IMG_random_stage = load_theme_img("random_stage")
   self.images.IMG_random_character = load_theme_img("random_character")
 
-  self.images.IMG_healthbar_frame_1P = load_theme_img("healthbar_frame_1P")
-  self.images.IMG_healthbar_frame_2P = load_theme_img("healthbar_frame_2P")
+  if self.multibar_is_absolute then
+    self.images.IMG_healthbar_frame_1P = load_theme_img("healthbar_frame_1P_absolute")
+    self.images.IMG_healthbar_frame_2P = load_theme_img("healthbar_frame_2P_absolute")
+  else
+    self.images.IMG_healthbar_frame_1P = load_theme_img("healthbar_frame_1P")
+    self.images.IMG_healthbar_frame_2P = load_theme_img("healthbar_frame_2P")
+  end
   self.images.IMG_healthbar = load_theme_img("healthbar")
-
-  self.images.IMG_prestop_frame = load_theme_img("prestop_frame")
-  self.images.IMG_prestop_bar = load_theme_img("prestop_bar")
-
-  self.images.IMG_stop_frame = load_theme_img("stop_frame")
-  self.images.IMG_stop_bar = load_theme_img("stop_bar")
-
-  self.images.IMG_shake_frame = load_theme_img("shake_frame")
-  self.images.IMG_shake_bar = load_theme_img("shake_bar")
 
   self.images.IMG_multibar_frame = load_theme_img("multibar_frame")
   self.images.IMG_multibar_prestop_bar = load_theme_img("multibar_prestop_bar")
   self.images.IMG_multibar_stop_bar = load_theme_img("multibar_stop_bar")
   self.images.IMG_multibar_shake_bar = load_theme_img("multibar_shake_bar")
 
+  self.images.IMG_bug = load_theme_img("bug")
+
   --play field frames, plus the wall at the bottom.
   self.images.IMG_frame1P = load_theme_img("frame/frame1P")
   self.images.IMG_wall1P = load_theme_img("frame/wall1P")
   self.images.IMG_frame2P = load_theme_img("frame/frame2P")
   self.images.IMG_wall2P = load_theme_img("frame/wall2P")
-  --the game currently only supports 2 players, but since 3P+ support is on the "to-do-eventually" list, include assets for more players
-  --special thanks to TheWolfBunny on DeviantArt for 3P+ frame and wall sprites
-  self.images.IMG_frame3P = load_theme_img("frame/frame3P")
-  self.images.IMG_wall3P = load_theme_img("frame/wall3P")
-  self.images.IMG_frame4P = load_theme_img("frame/frame4P")
-  self.images.IMG_wall4P = load_theme_img("frame/wall4P")
-  --5P-8P might be overkill, but just imagine...
-  --self.images.IMG_frame5P = load_theme_img("frame/frame5P")
-  --self.images.IMG_wall5P = load_theme_img("frame/wall5P")
-  --self.images.IMG_frame6P = load_theme_img("frame/frame6P")
-  --self.images.IMG_wall6P = load_theme_img("frame/wall6P")
-  --self.images.IMG_frame7P = load_theme_img("frame/frame7P")
-  --self.images.IMG_wall7P = load_theme_img("frame/wall7P")
-  --self.images.IMG_frame8P = load_theme_img("frame/frame8P")
-  --self.images.IMG_wall8P = load_theme_img("frame/wall8P")
 
   self.images.IMG_swap = load_theme_img("swap")
   self.images.IMG_apm = load_theme_img("apm")
@@ -252,11 +227,27 @@ function Theme.graphics_init(self)
   self.images.IMG_cursor = {}
   for player_num = 1, MAX_SUPPORTED_PLAYERS do
     self.images.IMG_players[player_num] = load_theme_img("p" .. player_num)
-    self.images.IMG_cursor[player_num] = load_theme_img("p" .. player_num .. "_cursor")
     self.images.IMG_char_sel_cursors[player_num] = {}
     for position_num = 1, 2 do
       self.images.IMG_char_sel_cursors[player_num][position_num] = load_theme_img("p" .. player_num .. "_select_screen_cursor" .. position_num)
     end
+  end
+
+  -- Cursor animation is 2 frames
+  for i = 1, 2 do
+    -- Cursor images used to be named weird and make modders think they were for different players
+    -- Load either format from the custom theme, and fallback to the built in cursor otherwise.
+    local cursorImage = load_theme_img("cursor" .. i, false)
+    local legacyCursorImage = load_theme_img("p" .. i .. "_cursor", false)
+    if not cursorImage then
+      if legacyCursorImage then
+        cursorImage = legacyCursorImage
+      else
+        cursorImage = load_theme_img("cursor" .. i, true)
+      end
+    end
+    assert(cursorImage ~= nil)
+    self.images.IMG_cursor[i] = cursorImage
   end
 
   self.images.IMG_char_sel_cursor_halves = {left = {}, right = {}}
@@ -272,6 +263,15 @@ function Theme.graphics_init(self)
       local cur_width, cur_height = self.images.IMG_char_sel_cursors[player_num][position_num]:getDimensions()
       local half_width, half_height = cur_width / 2, cur_height / 2
       self.images.IMG_char_sel_cursor_halves.right[player_num][position_num] = love.graphics.newQuad(half_width, 0, half_width, cur_height, cur_width, cur_height)
+    end
+  end
+
+  self.font.size = themes[config.theme].font.size or 12
+  for key, value in pairs(FileUtil.getFilteredDirectoryItems("themes/" .. config.theme)) do
+    if value:lower():match(".*%.ttf") then -- Any .ttf file
+      self.font.path = "themes/" .. config.theme .. "/" .. value
+      set_global_font(self.font.path, self.font.size)
+      break
     end
   end
 end
@@ -534,121 +534,6 @@ function Theme.json_init(self)
     self.healthbar_Rotate = read_data.healthbar_Rotate
   end
 
-  -- Prestop frame position
-  if read_data.prestop_frame_Pos and type(read_data.prestop_frame_Pos) == "table" then
-    self.prestop_frame_Pos = read_data.prestop_frame_Pos
-  end
-
-  -- Prestop frame scale
-  if read_data.prestop_frame_Scale and type(read_data.prestop_frame_Scale) == "number" then
-    self.prestop_frame_Scale = read_data.prestop_frame_Scale
-  end
-
-  -- Prestop bar position
-  if read_data.prestop_bar_Pos and type(read_data.prestop_bar_Pos) == "table" then
-    self.prestop_bar_Pos = read_data.prestop_bar_Pos
-  end
-
-  -- Prestop bar scale
-  if read_data.prestop_bar_Scale and type(read_data.prestop_bar_Scale) == "number" then
-    self.prestop_bar_Scale = read_data.prestop_bar_Scale
-  end
-
-  -- Prestop bar Rotate
-  if read_data.prestop_bar_Rotate and type(read_data.prestop_bar_Rotate) == "number" then
-    self.prestop_bar_Rotate = read_data.prestop_bar_Rotate
-  end
-
-  -- Prestop position
-  if read_data.prestop_Pos and type(read_data.prestop_Pos) == "table" then
-    self.prestop_Pos = read_data.prestop_Pos
-  end
-
-  -- Prestop scale
-  if read_data.prestop_Scale and type(read_data.prestop_Scale) == "number" then
-    self.prestop_Scale = read_data.prestop_Scale
-  end
-
-  -- Stop frame position
-  if read_data.stop_frame_Pos and type(read_data.stop_frame_Pos) == "table" then
-    self.stop_frame_Pos = read_data.stop_frame_Pos
-  end
-
-  -- Stop frame scale
-  if read_data.stop_frame_Scale and type(read_data.stop_frame_Scale) == "number" then
-    self.stop_frame_Scale = read_data.stop_frame_Scale
-  end
-
-  -- Stop bar position
-  if read_data.stop_bar_Pos and type(read_data.stop_bar_Pos) == "table" then
-    self.stop_bar_Pos = read_data.stop_bar_Pos
-  end
-
-  -- Stop bar scale
-  if read_data.stop_bar_Scale and type(read_data.stop_bar_Scale) == "number" then
-    self.stop_bar_Scale = read_data.stop_bar_Scale
-  end
-
-  -- Stop bar Rotate
-  if read_data.stop_bar_Rotate and type(read_data.stop_bar_Rotate) == "number" then
-    self.stop_bar_Rotate = read_data.stop_bar_Rotate
-  end
-
-  -- Stop position
-  if read_data.stop_Pos and type(read_data.stop_Pos) == "table" then
-    self.stop_Pos = read_data.stop_Pos
-  end
-
-  -- Stop scale
-  if read_data.stop_Scale and type(read_data.stop_Scale) == "number" then
-    self.stop_Scale = read_data.stop_Scale
-  end
-
-  -- Shake frame position
-  if read_data.shake_frame_Pos and type(read_data.shake_frame_Pos) == "table" then
-    self.shake_frame_Pos = read_data.shake_frame_Pos
-  end
-
-  -- Shake frame scale
-  if read_data.shake_frame_Scale and type(read_data.shake_frame_Scale) == "number" then
-    self.shake_frame_Scale = read_data.shake_frame_Scale
-  end
-
-  -- Shake bar position
-  if read_data.shake_bar_Pos and type(read_data.shake_bar_Pos) == "table" then
-    self.shake_bar_Pos = read_data.shake_bar_Pos
-  end
-
-  -- Shake bar scale
-  if read_data.shake_bar_Scale and type(read_data.shake_bar_Scale) == "number" then
-    self.shake_bar_Scale = read_data.shake_bar_Scale
-  end
-
-  -- Shake bar Rotate
-  if read_data.shake_bar_Rotate and type(read_data.shake_bar_Rotate) == "number" then
-    self.shake_bar_Rotate = read_data.shake_bar_Rotate
-  end
-
-  -- Shake position
-  if read_data.shake_Pos and type(read_data.shake_Pos) == "table" then
-    self.shake_Pos = read_data.shake_Pos
-  end
-
-  -- Shake scale
-  if read_data.shake_Scale and type(read_data.shake_Scale) == "number" then
-    self.shake_Scale = read_data.shake_Scale
-  end
-
-  -- Multibar frame position
-  if read_data.multibar_frame_Pos and type(read_data.multibar_frame_Pos) == "table" then
-    self.multibar_frame_Pos = read_data.multibar_frame_Pos
-  end
-
-  -- Multibar frame scale
-  if read_data.multibar_frame_Scale and type(read_data.multibar_frame_Scale) == "number" then
-    self.multibar_frame_Scale = read_data.multibar_frame_Scale
-  end
-
   -- Multibar position
   if read_data.multibar_Pos and type(read_data.multibar_Pos) == "table" then
     self.multibar_Pos = read_data.multibar_Pos
@@ -663,15 +548,91 @@ function Theme.json_init(self)
   if read_data.multibar_is_absolute and type(read_data.multibar_is_absolute) == "boolean" then
     self.multibar_is_absolute = read_data.multibar_is_absolute
   end
+
+  -- Font size
+  if read_data.font_size and type(read_data.font_size) == "number" then
+    self.font.size = read_data.font_size
+  end
+  
+  -- Background Speeds
+  if read_data.bg_title_speed_x and type(read_data.bg_title_speed_x) == "number" then
+    self.bg_title_speed_x = read_data.bg_title_speed_x
+  end
+  if read_data.bg_title_speed_y and type(read_data.bg_title_speed_y) == "number" then
+    self.bg_title_speed_y = read_data.bg_title_speed_y
+  end
+
+  if read_data.bg_main_speed_x and type(read_data.bg_main_speed_x) == "number" then
+    self.bg_main_speed_x = read_data.bg_main_speed_x
+  end
+  if read_data.bg_main_speed_y and type(read_data.bg_main_speed_y) == "number" then
+    self.bg_main_speed_y = read_data.bg_main_speed_y
+  end
+
+  if read_data.bg_select_screen_speed_x and type(read_data.bg_select_screen_speed_x) == "number" then
+    self.bg_select_screen_speed_x = read_data.bg_select_screen_speed_x
+  end
+  if read_data.bg_select_screen_speed_y and type(read_data.bg_select_screen_speed_y) == "number" then
+    self.bg_select_screen_speed_y = read_data.bg_select_screen_speed_y
+  end
+
+  if read_data.bg_readme_speed_x and type(read_data.bg_readme_speed_x) == "number" then
+    self.bg_readme_speed_x = read_data.bg_readme_speed_x
+  end
+  if read_data.bg_readme_speed_y and type(read_data.bg_readme_speed_y) == "number" then
+    self.bg_readme_speed_y = read_data.bg_readme_speed_y
+  end
+
+  if read_data.bg_title_is_tiled and type(read_data.bg_title_is_tiled) == "boolean" then
+    self.bg_title_is_tiled = read_data.bg_title_is_tiled
+  end
+  if read_data.bg_main_is_tiled and type(read_data.bg_main_is_tiled) == "boolean" then
+    self.bg_main_is_tiled = read_data.bg_main_is_tiled
+  end
+  if read_data.bg_select_screen_is_tiled and type(read_data.bg_select_screen_is_tiled) == "boolean" then
+    self.bg_select_screen_is_tiled = read_data.bg_select_screen_is_tiled
+  end
+  if read_data.bg_readme_is_tiled and type(read_data.bg_readme_is_tiled) == "boolean" then
+    self.bg_readme_is_tiled = read_data.bg_readme_is_tiled
+  end
+
+end
+
+function Theme:final_init()
+
+  local titleImage = load_theme_img("background/title", false)
+  if titleImage then
+    self.images.bg_title = UpdatingImage(titleImage, self.bg_title_is_tiled, self.bg_title_speed_x, self.bg_title_speed_y, canvas_width, canvas_height)
+  end
+
+  self.images.bg_main = UpdatingImage(load_theme_img("background/main"), self.bg_main_is_tiled, self.bg_main_speed_x, self.bg_main_speed_y, canvas_width, canvas_height)
+  self.images.bg_select_screen = UpdatingImage(load_theme_img("background/select_screen"), self.bg_select_screen_is_tiled, self.bg_select_speed_x, self.bg_select_speed_y, canvas_width, canvas_height)
+  self.images.bg_readme = UpdatingImage(load_theme_img("background/readme"), self.bg_readme_is_tiled, self.bg_readme_speed_x, self.bg_readme_speed_y, canvas_width, canvas_height)
+
+  local menuYPadding = 10
+  self.centerMenusVertically = true
+  if themes[config.theme].images.bg_title then
+    menuYPadding = 100
+    self.main_menu_screen_pos = {532, menuYPadding}
+    self.main_menu_y_max = canvas_height - menuYPadding
+  else
+    self.main_menu_screen_pos = {532, 249}
+    self.main_menu_y_max = canvas_height - menuYPadding
+    self.centerMenusVertically = false
+  end
+  self.main_menu_max_height = (self.main_menu_y_max - self.main_menu_screen_pos[2])
+  self.main_menu_y_center = self.main_menu_screen_pos[2] + (self.main_menu_max_height / 2)
+
 end
 
 -- loads a theme into the game
 function Theme.load(self, id)
-  print("loading theme " .. id)
+  logger.debug("loading theme " .. id)
+  self:json_init()
   self:graphics_init()
   self:sound_init()
-  self:json_init()
-  print("loaded theme " .. id)
+  self:final_init()
+  logger.debug("loaded theme " .. id)
 end
 
 -- initializes a theme

@@ -8,7 +8,7 @@ require("csprng")
 require("server_file_io")
 require("util")
 require("timezones")
-local lfs = require("lfs")
+local lfs = love.filesystem
 
 local byte = string.byte
 local char = string.char
@@ -23,13 +23,14 @@ local CHARACTERSELECT = "character select" -- room states
 local PLAYING = "playing" -- room states
 local sep = package.config:sub(1, 1) --determines os directory separator (i.e. "/" or "\")
 
+SERVER_MODE = true -- global to know the server is running the process
 local VERSION = "046"
 local type_to_length = {H = 4, E = 4, F = 4, P = 8, I = 2, L = 2, Q = 8, U = 2}
-local INDEX = 1
+local INDEX = 1 -- GLOBAL counter of the next available connection index
 local connections = {}
 local ROOMNUMBER = 1
 local rooms = {}
-local name_to_idx = {}
+local name_to_idx = {} -- mapping of names to their connection unique INDEX
 local socket_to_idx = {}
 local proposals = {}
 local playerbases = {}
@@ -43,7 +44,7 @@ function addPublicPlayerData(players, playerName, player)
     return
   end
 
-  if not players[player.name] then
+  if not players[playerName] then
     players[playerName] = {}
   end
 
@@ -310,6 +311,10 @@ function Room.add_spectator(self, new_spectator_connection)
     player_settings = {character = self.a.character, character_display_name = self.a.character_display_name, level = self.a.level, player_number = self.a.player_number},
     opponent_settings = {character = self.b.character, character_display_name = self.b.character_display_name, level = self.b.level, player_number = self.b.player_number}
   }
+  if COMPRESS_SPECTATOR_REPLAYS_ENABLED then
+    msg.replay_of_match_so_far.vs.in_buf = compress_input_string(msg.replay_of_match_so_far.vs.in_buf)
+    msg.replay_of_match_so_far.vs.I = compress_input_string(msg.replay_of_match_so_far.vs.I)
+  end
   new_spectator_connection:send(msg)
   msg = {spectators = self:spectator_names()}
   logger.debug("sending spectator list: " .. json.encode(msg))
@@ -384,9 +389,23 @@ Playerbase =
   end
 )
 
-function Playerbase.update(self, user_id, user_name)
+function Playerbase:update(user_id, user_name)
   self.players[user_id] = user_name
   write_players_file()
+end
+
+-- returns true if the name is taken by a different user already
+function Playerbase:nameTaken(userID, playerName)
+
+  for key, value in pairs(self.players) do
+    if value:lower() == playerName:lower() then
+      if key ~= userID then
+        return true
+      end
+    end
+  end
+
+  return false
 end
 
 function Playerbase.delete_player(self, user_id)
@@ -413,7 +432,7 @@ Leaderboard =
   class(
   function(s, name)
     s.name = name
-    s.players = {}
+    s.players = {} -- user_id -> user_id,user_name,rating,placement_done,placement_rating,ranked_games_played,ranked_games_won,last_login_time
   end
 )
 
@@ -494,7 +513,6 @@ Connection =
     connections[s.index] = s
     socket_to_idx[socket] = s.index
     s.socket = socket
-    socket:settimeout(0)
     s.leftovers = ""
     s.state = "needs_name"
     s.room = nil
@@ -534,7 +552,7 @@ function Connection.send(self, stuff)
       logger.trace(unpack(foo))
     end
     if not foo[1] then
-      logger.warn("WARNING: Connection.send failed. will retry...")
+      logger.info("WARNING: Connection.send failed. will retry...")
       retry_count = retry_count + 1
     end
   end
@@ -560,25 +578,39 @@ function Connection.login(self, user_id)
     deny_login(self, "Client did not send a user_id in the login request")
     success = false
   elseif self.user_id == "need a new user id" and self.name then
-    logger.info(self.name .. " needs a new user id!")
-    local their_new_user_id
-    while not their_new_user_id or playerbase.players[their_new_user_id] do
-      their_new_user_id = generate_new_user_id()
+
+    if playerbase:nameTaken("", self.name) then
+      self:send({choose_another_name = {reason = "That player name is already taken"}})
+      logger.warn("Login failure: Player tried to create a new user with an already taken name: " .. self.name)
+    else 
+      logger.info(self.name .. " needs a new user id!")
+      local their_new_user_id
+      while not their_new_user_id or playerbase.players[their_new_user_id] do
+        their_new_user_id = generate_new_user_id()
+      end
+      playerbase:update(their_new_user_id, self.name)
+      self:send({login_successful = true, new_user_id = their_new_user_id})
+      self.user_id = their_new_user_id
+      self.logged_in = true
+      logger.info("Connection with name " .. self.name .. " was assigned a new user_id")
     end
-    playerbase:update(their_new_user_id, self.name)
-    self:send({login_successful = true, new_user_id = their_new_user_id})
-    self.user_id = their_new_user_id
-    self.logged_in = true
-    logger.info("Connection with name " .. self.name .. " was assigned a new user_id")
   elseif not playerbase.players[self.user_id] then
     deny_login(self, "The user_id provided was not found on this server")
     logger.warn("Login failure: " .. self.name .. " specified an invalid user_id")
   elseif playerbase.players[self.user_id] ~= self.name then
-    local the_old_name = playerbase.players[self.user_id]
-    playerbase:update(self.user_id, self.name)
-    self.logged_in = true
-    self:send({login_successful = true, name_changed = true, old_name = the_old_name, new_name = self.name})
-    logger.info("Login successful and changed name " .. the_old_name .. " to " .. self.name)
+    if playerbase:nameTaken(self.user_id, self.name) then
+      self:send({choose_another_name = {reason = "That player name is already taken"}})
+      logger.warn("Login failure: Player tried to use already taken name: " .. self.name)
+    else 
+      local the_old_name = playerbase.players[self.user_id]
+      playerbase:update(self.user_id, self.name)
+      if leaderboard.players[self.user_id] then
+        leaderboard.players[self.user_id].user_name = self.name
+      end
+      self.logged_in = true
+      self:send({login_successful = true, name_changed = true, old_name = the_old_name, new_name = self.name})
+      logger.warn("Login successful and changed name " .. the_old_name .. " to " .. self.name)
+    end
   elseif playerbase.players[self.user_id] then
     self.logged_in = true
     self:send({login_successful = true})
@@ -654,10 +686,6 @@ function Connection.setup_game(self)
   lobby_changed = true --TODO: remove this line when we implement joining games in progress
   self.vs_mode = true
   self.metal = false
-  self.rows_left = 14 + random(1, 8)
-  self.prev_metal_col = nil
-  self.metal_col = nil
-  self.first_seven = nil
 end
 
 function Connection.close(self)
@@ -665,7 +693,7 @@ function Connection.close(self)
     lobby_changed = true
   end
   if self.room and (self.room.a.name == self.name or self.room.b.name == self.name) then
-    logger.warn("about to close room for " .. (self.name or "nil") .. ".  Connection.close was called")
+    logger.info("about to close room for " .. (self.name or "nil") .. ".  Connection.close was called")
     self.room:close()
   elseif self.room then
     self.room:remove_spectator(self)
@@ -683,7 +711,7 @@ function Connection.close(self)
 end
 
 function Connection.H(self, version)
-  if version ~= VERSION then
+  if version ~= VERSION and not ANY_ENGINE_VERSION_ENABLED then
     self:send("N")
   else
     self:send("H")
@@ -736,7 +764,7 @@ function Room.resolve_game_outcome(self)
     if self.game_outcome_reports[1] ~= self.game_outcome_reports[2] then
       --if clients disagree, the server needs to decide the outcome, perhaps by watching a replay it had created during the game.
       --for now though...
-      logger.info("clients " .. self.a.name .. " and " .. self.b.name .. " disagree on their game outcome. So the server will decide.")
+      logger.warn("clients " .. self.a.name .. " and " .. self.b.name .. " disagree on their game outcome. So the server will declare a tie.")
       outcome = 0
     else
       outcome = self.game_outcome_reports[1]
@@ -744,7 +772,6 @@ function Room.resolve_game_outcome(self)
     logger.info("resolve_game_outcome says: " .. outcome)
     --outcome is the player number of the winner, or 0 for a tie
     if self.a.save_replays_publicly ~= "not at all" and self.b.save_replays_publicly ~= "not at all" then
-      --write_replay_file(self.replay, "replay.txt")
       --use UTC time for dates on replays
       local now = os.date("*t", to_UTC(os.time()))
       local path = "ftp" .. sep .. "replays" .. sep .. "v" .. VERSION .. sep .. string.format("%04d" .. sep .. "%02d" .. sep .. "%02d", now.year, now.month, now.day)
@@ -1185,10 +1212,8 @@ function Connection.P(self, message)
     return
   end
   local ncolors = 0 + message[1]
-  local ret = make_panels(ncolors, string.sub(message, 2, 7), self)
-  if self.first_seven and self.opponent and ((self.level < 9 and self.opponent.level < 9) or (self.level >= 9 and self.opponent.level >= 9)) then
-    self.opponent.first_seven = self.first_seven
-  end
+  -- TODO: remove this server message type
+  local ret = "Garbage Panel Generation is now local only"
   self:send("P" .. ret)
   if self.player_number == 1 then
     self.room:send_to_spectators("P" .. ret)
@@ -1207,7 +1232,8 @@ function Connection.Q(self, message)
     return
   end
   local ncolors = 0 + message[1]
-  local ret = make_gpanels(ncolors, string.sub(message, 2, 7))
+  -- TODO: remove this server message type
+  local ret = "Garbage Panel Generation is now local only"
   self:send("Q" .. ret)
   if self.player_number == 1 then
     self.room:send_to_spectators("Q" .. ret)
@@ -1224,7 +1250,14 @@ end
 function Connection.J(self, message)
   message = json.decode(message)
   local response
-  if self.state == "needs_name" then
+  if message.error_report then -- Error report is checked for first so that a full login is not required
+    logger.warn("Recieved an error report.")
+    if not write_error_report(message.error_report) then
+      logger.error("The error report was either too large or had an I/O failure when attempting to write the file.")
+    end
+    self:close() -- After sending the error report, the client will throw the error, so end the connection.
+    return
+  elseif self.state == "needs_name" then
     if not message.name or message.name == "" then
       logger.warn("connection didn't send a name")
       response = {choose_another_name = {reason = "Name cannot be blank"}}
@@ -1495,6 +1528,10 @@ function load_server()
 
 server_socket = socket.bind("*", SERVER_PORT or 49569) --for official server
 --local server_socket = socket.bind("*", 59569) --for beta server
+server_socket:settimeout(0)
+if TCP_NODELAY_ENABLED then
+  server_socket:setoption("tcp-nodelay", true)
+end
 local sep = package.config:sub(1, 1)
 logger.info("sep: " .. sep)
 playerbase = Playerbase("playerbase")
@@ -1559,8 +1596,15 @@ end
 local prev_now = time()
 function love.update(dt)
   server_socket:settimeout(0)
+  if TCP_NODELAY_ENABLED then
+    server_socket:setoption("tcp-nodelay", true)
+  end
   local new_conn = server_socket:accept()
   if new_conn then
+    new_conn:settimeout(0)
+    if TCP_NODELAY_ENABLED then
+      new_conn:setoption("tcp-nodelay", true)
+    end
     Connection(new_conn)
   end
   local recvt = {server_socket}

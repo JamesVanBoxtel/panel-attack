@@ -86,6 +86,9 @@ end
 
 -- copy the table one key deep
 function shallowcpy(tab)
+  if tab == nil then
+    return nil
+  end
   local ret = {}
   for k, v in pairs(tab) do
     ret[k] = v
@@ -124,6 +127,22 @@ function deepcpy(tab)
   return ret
 end
 
+function table_to_string(tab)
+  local ret = ""
+  for k,v in pairs(tab) do
+    if type(v) == "table" then
+      ret = ret..k.." table:\n"..table_to_string(v).."\n"
+    else
+      ret = ret..k.." "..tostring(v).."\n"
+    end
+  end
+  return ret
+end
+
+function sign(x)
+  return (x<0 and -1) or 1
+end
+
 --Note: this round() doesn't work with negative numbers
 function round(positive_decimal_number, number_of_decimal_places)
   if not number_of_decimal_places then
@@ -133,26 +152,22 @@ function round(positive_decimal_number, number_of_decimal_places)
 end
 
 -- Returns a time string for the number of frames
-function frames_to_time_string(frame_count, include_60ths_of_secs)
-  local hour_min_sep = ":"
+function frames_to_time_string(frame_count, include_milliseconds)
   local min_sec_sep = ":"
   local sec_60th_sep = "'"
   local ret = ""
-  if frame_count >= 216000 then
-    --enough to include hours
-    ret = ret .. math.floor(frame_count / 216000)
-    --minutes with 2 digits (like 05 instead of 5)
-    ret = ret .. hour_min_sep .. string.format("%02d", math.floor(frame_count / 3600 % 3600))
-  else
-    --minutes with only one digit if only one digit if needed
-    ret = ret .. math.floor(frame_count / 3600 % 3600)
-  end
+
+  --minutes with only one digit if only one digit if needed
+  ret = ret .. math.floor(frame_count / 3600 % 3600)
+
   --seconds
   ret = ret .. min_sec_sep .. string.format("%02d", math.floor(frame_count / 60 % 60))
-  if include_60ths_of_secs then
-    --also include 60ths of a second
-    ret = ret .. sec_60th_sep .. string.format("%02d", frame_count % 60)
+  
+  if include_milliseconds then
+    --also include milliseconds
+    ret = ret .. sec_60th_sep .. string.format("%03d", ((1000 / 60) * (frame_count % 60)))
   end
+  
   return ret
 end
 
@@ -186,13 +201,6 @@ end
 -- Remove white space from the ends of a string
 function trim(s)
   return (s:gsub("^%s*(.-)%s*$", "%1"))
-end
-
--- Gets all the contents of a directory
-function get_directory_contents(path)
-  local path = (path and path or "")
-  local results = love.filesystem.getDirectoryItems(path)
-  return results
 end
 
 function compress_input_string(inputs)
@@ -243,7 +251,8 @@ function uncompress_input_string(inputs)
   end
 end
 
-function dump(o)
+function dump(o, includeNewLines)
+  includeNewLines = includeNewLines or false
   if type(o) == "table" then
     local s = "{ "
     for k, v in pairs(o) do
@@ -251,6 +260,9 @@ function dump(o)
         k = '"' .. k .. '"'
       end
       s = s .. "[" .. k .. "] = " .. dump(v) .. ","
+      if includeNewLines then
+        s = s .. "\n"
+      end
     end
     return s .. "} "
   else

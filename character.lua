@@ -14,6 +14,7 @@ local other_images = {
   "left",
   "right",
   "face",
+  "face2",
   "pop",
   "doubleface",
   "filler1",
@@ -35,6 +36,7 @@ local defaulted_images = {
   left = true,
   right = true,
   face = true,
+  face2 = false,
   pop = true,
   doubleface = true,
   filler1 = true,
@@ -46,7 +48,7 @@ local defaulted_images = {
   fade = true
 } -- those images will be defaulted if missing
 local basic_sfx = {"selection"}
-local other_sfx = {"chain", "combo", "combo_echo", "chain_echo", "chain2", "chain2_echo", "garbage_match", "garbage_land", "win", "taunt_up", "taunt_down"}
+local other_sfx = {"chain", "combo", "combo_echo", "chain2", "chain_echo", "chain2_echo", "garbage_match", "garbage_land", "win", "taunt_up", "taunt_down"}
 local defaulted_sfxs = {} -- those sfxs will be defaulted if missing
 local basic_musics = {}
 local other_musics = {"normal_music", "danger_music", "normal_music_start", "danger_music_start"}
@@ -177,7 +179,7 @@ function Character.stop_sounds(self)
 end
 
 function Character.play_selection_sfx(self)
-  if not SFX_mute and #self.sounds.selections ~= 0 then
+  if not GAME.muteSoundEffects and #self.sounds.selections ~= 0 then
     self.sounds.selections[math.random(#self.sounds.selections)]:play()
     return true
   end
@@ -186,7 +188,7 @@ end
 
 -- Stops old combo / chaing sounds and plays the appropriate chain or combo sound
 function Character.play_combo_chain_sfx(self, chain_combo)
-  if not SFX_mute then
+  if not GAME.muteSoundEffects then
     -- stop previous sounds if any
     for _, v in pairs(self.sounds.combos) do
       v:stop()
@@ -261,7 +263,7 @@ end
 -- Adds all the characters recursively in a folder to the global characters variable
 local function add_characters_from_dir_rec(path)
   local lfs = love.filesystem
-  local raw_dir_list = lfs.getDirectoryItems(path)
+  local raw_dir_list = FileUtil.getFilteredDirectoryItems(path)
   for i, v in ipairs(raw_dir_list) do
     local start_of_v = string.sub(v, 0, string.len(prefix_of_ignored_dirs))
     if start_of_v ~= prefix_of_ignored_dirs then
@@ -388,6 +390,19 @@ function characters_init()
   end
 end
 
+-- for reloading the graphics if the window was resized
+function characters_reload_graphics()
+  local characterIds = shallowcpy(characters_ids_for_current_theme)
+  for i = 1, #characterIds do
+    local character = characterIds[i]
+    local fullLoad = false
+    if character == config.character or (P1 and character == P1.character) or (P2 and character == P2.character) then
+      fullLoad = true
+    end
+    characters[character]:graphics_init(fullLoad, false)
+  end
+end
+
 function Character.is_bundle(self)
   return #self.sub_characters > 1
 end
@@ -395,7 +410,7 @@ end
 function Character.graphics_init(self, full, yields)
   local character_images = full and other_images or basic_images
   for _, image_name in ipairs(character_images) do
-    self.images[image_name] = load_img_from_supported_extensions(self.path .. "/" .. image_name)
+    self.images[image_name] = GraphicsUtil.loadImageFromSupportedExtensions(self.path .. "/" .. image_name)
     if not self.images[image_name] and defaulted_images[image_name] and not self:is_bundle() then
       if image_name == "burst" or image_name == "fade" then
         self.images[image_name] = themes[config.theme].images[image_name]
@@ -410,12 +425,53 @@ function Character.graphics_init(self, full, yields)
       coroutine.yield()
     end
   end
+  if full then
+    self.telegraph_garbage_images = {}
+    for garbage_h=1,14 do
+      self.telegraph_garbage_images[garbage_h] = {}
+      logger.debug("telegraph/"..garbage_h.."-tall")
+      self.telegraph_garbage_images[garbage_h][6] = GraphicsUtil.loadImageFromSupportedExtensions(self.path.."/telegraph/"..garbage_h.."-tall")
+      if not self.telegraph_garbage_images[garbage_h][6] and default_character.telegraph_garbage_images[garbage_h][6] then
+        self.telegraph_garbage_images[garbage_h][6] = default_character.telegraph_garbage_images[garbage_h][6]
+        logger.debug("DEFAULT used for telegraph/"..garbage_h.."-tall")
+      elseif not self.telegraph_garbage_images[garbage_h][6] then
+        logger.debug("FAILED TO LOAD: telegraph/"..garbage_h.."-tall")
+      end
+    end
+    for garbage_w=1,6 do
+      logger.debug("telegraph/"..garbage_w.."-wide")
+      self.telegraph_garbage_images[1][garbage_w] = GraphicsUtil.loadImageFromSupportedExtensions(self.path.."/telegraph/"..garbage_w.."-wide")
+      if not self.telegraph_garbage_images[1][garbage_w] and default_character.telegraph_garbage_images[1][garbage_w] then
+        self.telegraph_garbage_images[1][garbage_w] = default_character.telegraph_garbage_images[1][garbage_w]
+        logger.debug("DEFAULT used for telegraph/"..garbage_w.."-wide")
+      elseif not self.telegraph_garbage_images[1][garbage_w] then
+        logger.debug("FAILED TO LOAD: telegraph/"..garbage_w.."-wide")
+      end
+    end
+    logger.debug("telegraph/6-wide-metal")
+    self.telegraph_garbage_images["metal"] = GraphicsUtil.loadImageFromSupportedExtensions(self.path.."/telegraph/6-wide-metal")
+    if not self.telegraph_garbage_images["metal"] and default_character.telegraph_garbage_images["metal"] then
+      self.telegraph_garbage_images["metal"] = default_character.telegraph_garbage_images["metal"]
+      logger.debug("DEFAULT used for telegraph/6-wide-metal")
+    elseif not self.telegraph_garbage_images[1][garbage_w] then
+      logger.debug("FAILED TO LOAD: telegraph/6-wide-metal")
+    end
+    logger.debug("telegraph/attack")
+    self.telegraph_garbage_images["attack"] = GraphicsUtil.loadImageFromSupportedExtensions(self.path.."/telegraph/attack")
+    if not self.telegraph_garbage_images["attack"] and default_character.telegraph_garbage_images["attack"] then
+      self.telegraph_garbage_images["attack"] = default_character.telegraph_garbage_images["attack"]
+      logger.debug("DEFAULT used for telegraph/attack")
+    elseif not self.telegraph_garbage_images[1][garbage_w] then
+      logger.debug("FAILED TO LOAD: telegraph/attack")
+    end
+  end
 end
 
 function Character.graphics_uninit(self)
   for _, image_name in ipairs(other_images) do
     self.images[image_name] = nil
   end
+  self.telegraph_garbage_images = {}
 end
 
 function Character.init_sfx_variants(self, sfx_array, sfx_name, sfx_suffix_at_higher_count)
@@ -464,19 +520,16 @@ function Character.sound_init(self, full, yields)
 
     -- fallback case: chain/combo can be used for the other one if missing and for the longer names versions ("combo" used for "combo_echo" for instance)
     if not self.sounds.others[sfx] then
-      if sfx == "combo" then
-        self.sounds.others[sfx] = load_sound_from_supported_extensions(self.path .. "/chain", false)
-      elseif sfx == "chain" then
+      if sfx == "chain" then
         self.sounds.others[sfx] = load_sound_from_supported_extensions(self.path .. "/combo", false)
+      elseif sfx == "combo" then
+        self.sounds.others[sfx] = self.sounds.others["chain"]
       elseif sfx == "combo_echo" then
-        self.sounds.others[sfx] = load_sound_from_supported_extensions(self.path .. "/combo", false)
-        if not self.sounds.others[sfx] then
-          self.sounds.others[sfx] = load_sound_from_supported_extensions(self.path .. "/chain", false)
-        end
+        self.sounds.others[sfx] = self.sounds.others["combo"]
       elseif string.find(sfx, "chain") then
-        self.sounds.others[sfx] = load_sound_from_supported_extensions(self.path .. "/chain", false)
+        self.sounds.others[sfx] = self.sounds.others["chain"]
       elseif string.find(sfx, "combo") then
-        self.sounds.others[sfx] = load_sound_from_supported_extensions(self.path .. "/combo", false)
+        self.sounds.others[sfx] = self.sounds.others["combo"]
       end
     end
     if not self.sounds.others[sfx] and defaulted_sfxs[sfx] and not self:is_bundle() then

@@ -1,4 +1,5 @@
 require("graphics_util")
+local logger = require("logger")
 
 CLICK_MENUS = {} -- All click menus currently showing in the game
 
@@ -6,16 +7,23 @@ CLICK_MENUS = {} -- All click menus currently showing in the game
 -- Buttons are laid out vertically and scroll buttons are added if not all options fit.
 Click_menu =
   class(
-  function(self, x, y, width, height, active_idx)
-    self.x = x or 0
-    self.y = y or 0
-    self.width = width or (canvas_width - self.x - 30) --width not used yet for scrolling
-    self.height = height or (canvas_height - self.y - 30) --scrolling does care about height
+  function(self, xCenter, yMin, width, maxHeight, active_idx)
+    assert(xCenter)
+    assert(yMin)
+    self.x = xCenter
+    self.y = yMin
+    self.yMin = yMin
+    self.centerVertically = themes[config.theme].centerMenusVertically
+    self.current_setting_x = nil -- the x offset for the second column of options
+    local defaultPadding = 30
+    self.width = width or 0
+    self.maxHeight = maxHeight or (canvas_height - (2 * defaultPadding)) --scrolling does care about height
     self.new_item_y = 0
+    local menuXPosition = -100
     self.menu_controls = {
       up = {
         text = love.graphics.newText(get_global_font(), "^"),
-        x = self.width - 30,
+        x = menuXPosition,
         y = 10,
         w = 30,
         h = 30,
@@ -24,8 +32,26 @@ Click_menu =
       },
       down = {
         text = love.graphics.newText(get_global_font(), "v"),
-        x = self.width - 30,
-        y = 80,
+        x = menuXPosition,
+        y = 90,
+        w = 30,
+        h = 30,
+        outlined = true,
+        visible = false
+      },
+      left = {
+        text = love.graphics.newText(get_global_font(), "<"),
+        x = menuXPosition - 35,
+        y = 50,
+        w = 30,
+        h = 30,
+        outlined = true,
+        visible = false
+      },
+      right = {
+        text = love.graphics.newText(get_global_font(), ">"),
+        x = menuXPosition + 35,
+        y = 50,
         w = 30,
         h = 30,
         outlined = true,
@@ -53,10 +79,20 @@ Click_menu =
   end
 )
 
+function Click_menu:reloadGraphics()
+  for k, v in pairs(self.buttons) do
+    v.text = love.graphics.newText(get_global_font(), v.stringText)
+    if v.currentSettingText then
+      v.current_setting = love.graphics.newText(get_global_font(), v.currentSettingText)
+    end
+  end
+end
+
 function Click_menu.add_button(self, string_text, selectFunction, escapeFunction, leftFunction, rightFunction)
   self.buttons[#self.buttons + 1] = {
     text = love.graphics.newText(get_global_font(), string_text),
     stringText = string_text,
+    currentSettingText = nil,
     x = 0,
     y = 0,
     w = nil,
@@ -73,6 +109,13 @@ function Click_menu.add_button(self, string_text, selectFunction, escapeFunction
   self:layout_buttons()
 end
 
+function Click_menu:remove_button(index)
+  table.remove(self.buttons, index)
+
+  self:resize_to_fit()
+  self:layout_buttons()
+end
+
 -- Sets the string for the menu text
 function Click_menu.set_button_text(self, button_idx, string)
   self.buttons[button_idx].text = love.graphics.newText(get_global_font(), string)
@@ -82,6 +125,7 @@ end
 -- Sets the string to render to the right of the menu text
 function Click_menu.set_button_setting(self, button_idx, new_setting)
   self.buttons[button_idx].current_setting = love.graphics.newText(get_global_font(), new_setting)
+  self.buttons[button_idx].currentSettingText = new_setting
 end
 
 -- Sets the button at the given index's visibility
@@ -131,11 +175,15 @@ end
 function Click_menu.set_active_idx(self, idx)
   idx = wrap(1, idx, #self.buttons)
   self.active_idx = idx
-  local top_visible_button_before = self.top_visible_button
   self:update_top_button()
-  if self.top_visible_button ~= top_visible_button_before or not self.buttons[idx].visible then
-    self:layout_buttons()
-  end
+  self:layout_buttons()
+end
+
+-- Sets a new height and resizes the menu
+function Click_menu.setHeight(self, maxHeight)
+  self.maxHeight = maxHeight
+  self:resize_to_fit()
+  self:layout_buttons()
 end
 
 -- Repositions in the x direction so the menu doesn't go off the screen
@@ -159,13 +207,13 @@ function Click_menu.layout_buttons(self)
   if #self.buttons > 0 then
     local firstButtonHeight = self:get_button_height(1) + (2 * self.padding)
     local eachExtraButtonHeight = self:get_button_height(1) + self.padding_between_buttons
-    self.button_limit = self.button_limit + math.floor((self.height - firstButtonHeight) / eachExtraButtonHeight)
+    self.button_limit = self.button_limit + math.floor((self.maxHeight - firstButtonHeight) / eachExtraButtonHeight)
   end
 
   --scroll up or down if not showing the active button
   self:update_top_button()
 
-  local menu_is_full = false
+  local height = 0
   for i = 1, #self.buttons do
     if i < self.top_visible_button then
       self.buttons[i].visible = false
@@ -174,28 +222,32 @@ function Click_menu.layout_buttons(self)
       self.buttons[i].x = self.padding
       self.buttons[i].y = self.new_item_y
       self.new_item_y = self.new_item_y + self:get_button_height(i) + self.padding_between_buttons
+      height = math.max(height, self.new_item_y)
     else --button doesn't fit
-      menu_is_full = true
       self.buttons[i].visible = false
     end
   end
 
-  if #self.buttons > self.button_limit then
-    self:show_controls(true)
+  if self.centerVertically then
+    self.y = self.yMin + (self.maxHeight / 2) - (height / 2)
   else
-    self:show_controls(false)
+    self.y = self.yMin
   end
+
+  self:show_controls(false)
 end
 
 -- Sets the visibility of the scroll controls
-function Click_menu.show_controls(self, bool)
-  if bool or #self.buttons > self.button_limit then
-    for k, v in pairs(self.menu_controls) do
-      self.menu_controls[k].visible = true
-    end
-  else
-    for k, v in pairs(self.menu_controls) do
-      self.menu_controls[k].visible = false
+function Click_menu.show_controls(self, forceUpDownShowing)
+  local verticalControlsNeeded = #self.buttons > self.button_limit
+
+  for control_name, v in pairs(self.menu_controls) do
+    if control_name == "up" or control_name == "down" then
+      self.menu_controls[control_name].visible = forceUpDownShowing or verticalControlsNeeded
+    elseif control_name == "left" then
+      self.menu_controls[control_name].visible = #self.buttons >= self.active_idx and self.buttons[self.active_idx].leftFunction
+    elseif control_name == "right" then
+      self.menu_controls[control_name].visible = #self.buttons >= self.active_idx and self.buttons[self.active_idx].rightFunction
     end
   end
 end
@@ -226,7 +278,7 @@ function Click_menu.update(self)
       self:selectPreviousIndex()
     elseif menu_down() then
       self:selectNextIndex()
-    elseif menu_enter() then
+    elseif menu_enter_one_press() then
       if self.buttons[self.active_idx].selectFunction then
         self:selectButton(self.active_idx)
       end
@@ -289,7 +341,7 @@ function Click_menu.draw(self)
       end
     end
 
-    --draw menu controls (up and down scrolling buttons, so far)
+    --draw menu controls (up and down, left right, etc)
     for k, control in pairs(self.menu_controls) do
       if control.visible then
         if control.background then
@@ -315,12 +367,6 @@ function Click_menu.draw(self)
   end
 end
 
--- Moves the menu to the given location
-function Click_menu.move(self, x, y)
-  self.x = x or 0
-  self.y = y or 0
-end
-
 -- Handles taps or clicks on the menu
 function Click_menu.click_or_tap(self, x, y, touchpress)
   if self.active then
@@ -341,7 +387,7 @@ function Click_menu.click_or_tap(self, x, y, touchpress)
     for control_name, control in pairs(self.menu_controls) do
       if control.visible then
         if y >= self.y + control.y and y <= self.y + control.y + control.h and x >= self.x + control.x and x <= self.x + control.x + control.w then
-          --print(menu_name.."'s "..control_name.." was clicked or tapped")
+          --logger.debug(menu_name.."'s "..control_name.." was clicked or tapped")
           this_frame_keys[control_name] = true
           logger.debug("Click Menu tapped, pressing button: " .. control_name)
         end
