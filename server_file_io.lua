@@ -52,11 +52,10 @@ function read_deleted_players_file()
   pcall(
     function()
       local f = io.open("deleted_players.txt", "r")
-      local temp = io.input()
-      io.input(f)
-      playerbase.deleted_players = json.decode(io.read("*all"))
-      io.close(f)
-      io.input(temp)
+      if f then
+        playerbase.deleted_players = json.decode(io.read("*all"))
+        io.close(f)
+      end
     end
   )
 end
@@ -98,6 +97,7 @@ function write_leaderboard_file()
         public_leaderboard_table[#public_leaderboard_table + 1] = {v.user_name, v.rating, v.ranked_games_played}
       end
       csvfile.write("." .. sep .. "leaderboard.csv", leaderboard_table)
+      mkDir("." .. sep .. "ftp")
       csvfile.write("." .. sep .. "ftp" .. sep .. "PA_public_leaderboard.csv", public_leaderboard_table)
     end
   )
@@ -132,12 +132,11 @@ function read_leaderboard_file()
         end
       else
         print("failed to read any data from leaderboard.csv, checking for a leaderboard.txt")
-        local f = assert(io.open("leaderboard.txt", "r"))
-        local temp = io.input()
-        io.input(f)
-        leaderboard.players = json.decode(io.read("*all"))
-        io.close(f)
-        io.input(temp)
+        local f = io.open("leaderboard.txt", "r")
+        if f then
+          leaderboard.players = json.decode(io.read("*all"))
+          io.close(f)
+        end
       end
     end
   )
