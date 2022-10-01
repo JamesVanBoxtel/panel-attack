@@ -1,39 +1,6 @@
-local lfs = require("lfs")
+local lfs = love.filesystem
 local csvfile = require("simplecsv")
 local logger = require("logger")
-
-function os_rename(old_name, new_name)
-  os.rename(old_name, new_name)
-end
-
-function isFile(name)
-  if type(name) ~= "string" then
-    return false
-  end
-  if not isDir(name) then
-    return os.rename(name, name) and true or false
-  -- note that the short evaluation is to
-  -- return false instead of a possible nil
-  end
-  return false
-end
-
-function isFileOrDir(name)
-  if type(name) ~= "string" then
-    return false
-  end
-  return os.rename(name, name) and true or false
-end
-
-function isDir(name)
-  if type(name) ~= "string" then
-    return false
-  end
-  local cd = lfs.currentdir()
-  local is = lfs.chdir(name) and true or false
-  lfs.chdir(cd)
-  return is
-end
 
 function mkDir(path)
   local sep, pStr = package.config:sub(1, 1), ""
@@ -84,7 +51,7 @@ end
 function read_deleted_players_file()
   pcall(
     function()
-      local f = assert(io.open("deleted_players.txt", "r"))
+      local f = io.open("deleted_players.txt", "r")
       local temp = io.input()
       io.input(f)
       playerbase.deleted_players = json.decode(io.read("*all"))
