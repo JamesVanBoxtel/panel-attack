@@ -256,20 +256,22 @@ function Glicko2:update(matches)
 		newVol = exp(A/2)
 	end
 
-	-- step 6: compute new rating and RD
-	local newRD = sqrt(g2.RD^2 + newVol^2)
-	local newRating = g2.Rating
+	-- step 6: update the rating deviation to the new pre-rating period value
+	local ratingDeviation = sqrt(g2.RD^2 + newVol^2)
 	
-	if #matches > 0 then
-		newRD = 1/sqrt(1/newRD^2 + 1/v)
-		newRating = 0
+	-- Step 7: Update to the new rating
 
+	local newRD = 1/sqrt(1/ratingDeviation^2 + 1/v)
+	local newRating = g2.Rating
+
+	if #matches > 0 then
+		local accumulation = 0
 		for j, match in ipairs(matches) do
 			local EValue = E(g2.Rating, match.Rating, match.RD)
-			newRating = newRating + g(match.RD)*(match.Score - EValue)
+			accumulation = accumulation + g(match.RD)*(match.Score - EValue)
 		end
 
-		newRating = g2.Rating + newRD^2*newRating
+		newRating = g2.Rating + newRD^2*accumulation
 	end
 
 	--wrap up results

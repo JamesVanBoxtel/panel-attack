@@ -1,4 +1,5 @@
-Glicko2 = require("Glicko")
+local Glicko2 = require("Glicko")
+local simpleCSV = require("simplecsv")
 
 local function basicTest() 
   local player1 = Glicko2.g1(1500, 350)
@@ -82,8 +83,6 @@ local function getScoreResults(player1, player2, player1WinCount, gameCount)
   for i = 1, gameCount - player1WinCount, 1 do
     matchSet[#matchSet+1] = 0
   end
-
-  local updatedPlayer1 = player1:copy()
     
   local player1Results = {}
   for j = 1, #matchSet do -- play through games
@@ -94,6 +93,37 @@ local function getScoreResults(player1, player2, player1WinCount, gameCount)
   return player1Results
 end
 
+
+-- If starting RD is too high, or too many matches happen in one rating period, massive swings can happen.
+-- This test is to explore that and come up with sane values.
+local function testWeirdNumberStability() 
+
+  local initialVolatility = 0.06
+
+  local player1 = Glicko2.g1(1073, 20, initialVolatility)
+  local player2 = Glicko2.g1(1500, 100, initialVolatility)
+
+  local wins = 12
+  local total = 25
+  local player1Results = getScoreResults(player1, player2, wins, total)
+  local player2Results = getScoreResults(player2, player1, total-wins, total)
+
+  local updatedPlayer1 = player1:update(player1Results)
+  local updatedPlayer2 = player2:update(player2Results)
+
+  assert(updatedPlayer2.Rating > 1073)
+
+  player1Results = getScoreResults(player1, player2, 0, 1)
+  player2Results = getScoreResults(player2, player1, 1, 1)
+
+  updatedPlayer1 = player1:update(player1Results)
+  updatedPlayer2 = player2:update(player2Results)
+
+  assert(updatedPlayer1.Rating < updatedPlayer2.Rating)
+
+end
+
+testWeirdNumberStability()
 
 local function testRatingPeriods() 
   
@@ -178,3 +208,116 @@ local function testFarming()
 end 
 
 testFarming()
+
+local function invertedGameResult(gameResult)
+  if gameResult == 0 then
+    return 1
+  end
+  if gameResult == 1 then
+    return 0
+  end
+  return gameResult
+end
+
+local function ratingPeriodForTimeStamp(timestamp)
+  local ratingPeriodInSeconds = 60 * 20
+  local hour = math.floor(timestamp / (ratingPeriodInSeconds))
+  return hour
+end
+
+local function runRatingPeriods(firstRatingPeriod, lastRatingPeriod, players, glickoResultsTable)
+  -- Run each rating period (the later ones will just increase RD)
+  for i = firstRatingPeriod, lastRatingPeriod, 1 do
+    for playerID, playerTable in pairs(players) do
+      playerTable.glicko = playerTable.glicko:update(playerTable.gameResults)
+      playerTable.gameResults = {}
+    end
+
+    if i == firstRatingPeriod then
+      for playerID, playerTable in pairs(players) do
+        local row = {}
+        row[#row+1] = i
+        row[#row+1] = playerID
+        row[#row+1] = playerTable.glicko.Rating
+        row[#row+1] = playerTable.glicko.RD
+        glickoResultsTable[#glickoResultsTable+1] = row
+      end
+    end
+  end
+end
+
+local function testRealWorldData() 
+  
+  -- DEFAULTS
+  --Tau = 0.5, -- Slider for volatility, lower means RD changes more
+	--InitialVolatility = 0.06
+
+  -- Uncomment to set Tau
+  --Glicko2.Tau = 0.01
+
+  local initialRating = 1500
+  local initialRD = 350
+  local initialVolatility = 0.06
+
+  local players = {}
+  local glickoResultsTable = {}
+  local ratingPeriodNeedingRun = nil
+  local latestRatingPeriodFound = nil
+  local gameResults = simpleCSV.read("GameResults.csv")
+  assert(gameResults)
+  
+  for row = 1, #gameResults do
+    local player1ID = tonumber(gameResults[row][1])
+    local player2ID = tonumber(gameResults[row][2])
+    local winResult = tonumber(gameResults[row][3])
+    local ranked = tonumber(gameResults[row][4])
+    local timestamp = tonumber(gameResults[row][5])
+    local dateTable = os.date("*t", timestamp)
+
+    assert(player1ID)
+    assert(player2ID)
+    assert(winResult)
+    assert(ranked)
+    assert(timestamp)
+    assert(dateTable)
+
+    if ranked == 0 then
+      goto continue
+    end
+
+    latestRatingPeriodFound = ratingPeriodForTimeStamp(timestamp)
+    if ratingPeriodNeedingRun == nil then
+      ratingPeriodNeedingRun = latestRatingPeriodFound
+    end
+
+    -- if we just passed the rating period, time to update ratings
+    if ratingPeriodNeedingRun ~= latestRatingPeriodFound then
+      assert(latestRatingPeriodFound > ratingPeriodNeedingRun)
+      runRatingPeriods(ratingPeriodNeedingRun, latestRatingPeriodFound-1, players, glickoResultsTable)
+      ratingPeriodNeedingRun = latestRatingPeriodFound
+    end
+
+    if not players[player1ID] then
+      players[player1ID] = {}
+      players[player1ID].glicko = Glicko2.g1(initialRating, initialRD, initialVolatility)
+      players[player1ID].gameResults = {}
+    end
+    if not players[player2ID] then
+      players[player2ID] = {}
+      players[player2ID].glicko = Glicko2.g1(initialRating, initialRD, initialVolatility)
+      players[player2ID].gameResults = {}
+    end
+      
+    players[player1ID].gameResults[#players[player1ID].gameResults+1] = players[player2ID].glicko:score(winResult)
+    players[player2ID].gameResults[#players[player2ID].gameResults+1] = players[player1ID].glicko:score(invertedGameResult(winResult))    
+    ::continue::
+  end
+
+  -- Handle the last rating period
+  assert(ratingPeriodNeedingRun == latestRatingPeriodFound)
+  runRatingPeriods(ratingPeriodNeedingRun, latestRatingPeriodFound, players, glickoResultsTable)
+
+  simpleCSV.write("Glicko.csv", glickoResultsTable)
+end 
+
+testRealWorldData()
