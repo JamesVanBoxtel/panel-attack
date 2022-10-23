@@ -255,12 +255,10 @@ do
         infoYPosition = infoYPosition - fontHeight
       end
 
-      if GAME_UPDATER_GAME_VERSION then
-        gprintf("PA Version: " .. GAME_UPDATER_GAME_VERSION, -5, infoYPosition, canvas_width, "right")
-        infoYPosition = infoYPosition - fontHeight
-        if has_game_update then
-          menu_draw(panels[config.panels].images.classic[1][1], 1262, 685)
-        end
+      gprintf("PA Version: Tricksy Custom Build", -5, infoYPosition, canvas_width, "right")
+      infoYPosition = infoYPosition - fontHeight
+      if has_game_update then
+        menu_draw(panels[config.panels].images.classic[1][1], 1262, 685)
       end
 
       wait()

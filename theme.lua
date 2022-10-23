@@ -600,7 +600,7 @@ end
 
 function Theme:final_init()
 
-  local titleImage = load_theme_img("background/title", false)
+  local titleImage = GraphicsUtil.loadImageFromSupportedExtensions("themes/" .. default_theme_dir .. "/background/title")
   if titleImage then
     self.images.bg_title = UpdatingImage(titleImage, self.bg_title_is_tiled, self.bg_title_speed_x, self.bg_title_speed_y, canvas_width, canvas_height)
   end
