@@ -226,6 +226,16 @@ Stack =
     s.totalFramesBehind = 0
     s.warningsTriggered = {}
 
+    -- Kept to reduce garbage collection
+    local excludeMatchTable = {}
+    for row = 1, s.height do
+      excludeMatchTable[row] = {}
+      for col = 1, s.width do
+        excludeMatchTable[row][col] = false
+      end
+    end
+    s.excludeMatchTable = excludeMatchTable
+
   end)
 
 function Stack.setLevel(self, level)
@@ -2353,9 +2363,8 @@ function Stack.check_matches(self)
   end
 
   -- Record whether each panel excludes matching once to prevent duplicated work.
-  local excludeMatchTable = {}
+  local excludeMatchTable = self.excludeMatchTable
   for row = 1, self.height do
-    excludeMatchTable[row] = {}
     for col = 1, self.width do
       excludeMatchTable[row][col] = panels[row][col]:exclude_match()
     end
