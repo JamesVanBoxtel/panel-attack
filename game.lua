@@ -15,6 +15,7 @@ Game =
     self.renderDuringPause = false -- if the game can render when you are paused
     self.currently_paused_tracks = {} -- list of tracks currently paused
     self.rich_presence = nil
+    self.muteSoundEffects = false
     self.canvasX = 0
     self.canvasY = 0
     self.canvasXScale = 1
@@ -22,14 +23,21 @@ Game =
     self.availableScales = {1, 1.5, 2, 2.5, 3}
     self.showGameScale = false
     self.needsAssetReload = false
+    self.previousWindowWidth = 0
+    self.previousWindowHeight = 0
   end
 )
 
 function Game.clearMatch(self)
-  self.match = nil
+  if self.match then
+    self.match:deinit()
+    self.match = nil
+  end
   self.gameIsPaused = false
   self.renderDuringPause = false
+  self.preventSounds = false
   self.currently_paused_tracks = {}
+  self.muteSoundEffects = false
   P1 = nil
   P2 = nil
 end
@@ -64,6 +72,7 @@ end
 
 -- Updates the scale and position values to use up the right size of the window based on the user's settings.
 function Game:updateCanvasPositionAndScale(newWindowWidth, newWindowHeight)
+  local scaleIsUpdated = false
   if config.gameScaleType ~= "fit" then
     local availableScales = shallowcpy(self.availableScales)
     if config.gameScaleType == "fixed" then
@@ -80,24 +89,42 @@ function Game:updateCanvasPositionAndScale(newWindowWidth, newWindowHeight)
         GAME.canvasYScale = scale
         GAME.canvasX = math.floor((newWindowWidth - (scale * canvas_width)) / 2)
         GAME.canvasY = math.floor((newWindowHeight - (scale * canvas_height)) / 2)
-        return -- EARLY RETURN
+        scaleIsUpdated = true
+        break
       end
     end
   end
 
-  -- The only thing left to do is scale to fit the window
-  local w, h
-  GAME.canvasX, GAME.canvasY, w, h = scale_letterbox(newWindowWidth, newWindowHeight, 16, 9)
-  GAME.canvasXScale = w / canvas_width
-  GAME.canvasYScale = h / canvas_height
+  if scaleIsUpdated == false then
+    -- The only thing left to do is scale to fit the window
+    local w, h
+    GAME.canvasX, GAME.canvasY, w, h = scale_letterbox(newWindowWidth, newWindowHeight, 16, 9)
+    GAME.canvasXScale = w / canvas_width
+    GAME.canvasYScale = h / canvas_height
+  end
+
+  GAME.previousWindowWidth = newWindowWidth
+  GAME.previousWindowHeight = newWindowHeight
+end
+
+-- Provides a scale that is on .5 boundary to make sure it renders well.
+-- Useful for creating new canvas with a solid DPI
+function Game:newCanvasSnappedScale()
+  local result = math.max(1, math.floor(self.canvasXScale*2)/2)
+  return result
 end
 
 -- Reloads the canvas and all images / fonts for the new game scale
 function Game:refreshCanvasAndImagesForNewScale()
+  if themes == nil or themes[config.theme] == nil then
+    return -- EARLY RETURN, assets haven't loaded the first time yet
+    -- they will load through the normal process
+  end
+
   GAME:drawLoadingString(loc("ld_characters"))
   coroutine.yield()
 
-  self.globalCanvas = love.graphics.newCanvas(canvas_width, canvas_height, {dpiscale=GAME.canvasXScale})
+  self.globalCanvas = love.graphics.newCanvas(canvas_width, canvas_height, {dpiscale=GAME:newCanvasSnappedScale()})
   -- We need to reload all assets and fonts to get the new scaling info and filters
 
   -- Reload theme to get the new resolution assets

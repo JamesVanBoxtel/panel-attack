@@ -6,6 +6,7 @@ require("BattleRoom")
 require("util")
 require("table_util")
 require("consts")
+require("FileUtil")
 require("queue")
 require("globals")
 require("character") -- after globals!
@@ -18,6 +19,7 @@ require("AttackEngine")
 require("localization")
 require("graphics")
 GAME.input = require("input")
+require("replay")
 require("network")
 require("Puzzle")
 require("PuzzleSet")
@@ -29,7 +31,13 @@ require("gen_panels")
 require("panels")
 require("theme")
 require("click_menu")
+require("computerPlayers.computerPlayer")
 require("rich_presence.RichPresence")
+
+if PROFILING_ENABLED then
+  GAME.profiler = require("profiler")
+end
+
 local logger = require("logger")
 GAME.scores = require("scores")
 GAME.rich_presence = RichPresence()
@@ -43,6 +51,10 @@ local mainloop = nil
 
 -- Called at the beginning to load the game
 function love.load()
+  if PROFILING_ENABLED then
+    GAME.profiler:start()
+  end
+  
   love.graphics.setDefaultFilter("linear", "linear")
   if config.maximizeOnStartup and not love.window.isMaximized() then
     love.window.maximize()
@@ -57,7 +69,7 @@ function love.load()
   GAME.rich_presence:initialize("902897593049301004")
   mainloop = coroutine.create(fmainloop)
 
-  GAME.globalCanvas = love.graphics.newCanvas(canvas_width, canvas_height, {dpiscale=GAME.canvasXScale})
+  GAME.globalCanvas = love.graphics.newCanvas(canvas_width, canvas_height, {dpiscale=GAME:newCanvasSnappedScale()})
 end
 
 function love.focus(f)
@@ -92,6 +104,17 @@ function love.update(dt)
     GAME.backgroundImage:update(dt)
   end
 
+  local newPixelWidth, newPixelHeight = love.graphics.getWidth(), love.graphics.getHeight()
+  if GAME.previousWindowWidth ~= newPixelWidth or GAME.previousWindowHeight ~= newPixelHeight then
+    GAME:updateCanvasPositionAndScale(newPixelWidth, newPixelHeight)
+    if GAME.match then
+      GAME.needsAssetReload = true
+    else
+      GAME:refreshCanvasAndImagesForNewScale()
+    end
+    GAME.showGameScale = true
+  end
+
   local status, err = coroutine.resume(mainloop)
   if not status then
     local errorData = Game.errorData(err, debug.traceback(mainloop))
@@ -107,21 +130,6 @@ function love.update(dt)
 
   update_music()
   GAME.rich_presence:runCallbacks()
-end
-
-function love.resize(newPixelWidth, newPixelHeight)
-  if GAME then
-    local previousXScale = GAME.canvasXScale
-    GAME:updateCanvasPositionAndScale(newPixelWidth, newPixelHeight)
-    if previousXScale ~= GAME.canvasXScale then
-      if GAME.match then
-        GAME.needsAssetReload = true
-      else
-        GAME:refreshCanvasAndImagesForNewScale()
-      end
-    end
-    GAME.showGameScale = true
-  end
 end
 
 -- Called whenever the game needs to draw.
