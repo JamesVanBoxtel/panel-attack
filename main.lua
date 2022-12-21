@@ -277,6 +277,9 @@ function love.draw()
       runTimeGraph:draw()
     else
       gprintf("FPS: " .. love.timer.getFPS(), 1, 1)
+      gprintf("Flakes: " .. SnowFlake.flakeCount(), 1, 40)
+      gprintf("windSpeed: " .. SnowFlake.windSpeed(), 1, 80)
+      gprintf("peakWindDepth: " .. SnowFlake.peakWindDepth(), 1, 120)
     end
   end
 
