@@ -27,6 +27,7 @@ require("Puzzle")
 require("PuzzleSet")
 require("puzzles")
 require("mainloop")
+require("SnowFlake")
 require("sound")
 require("timezones")
 require("gen_panels")
@@ -53,6 +54,8 @@ local mainloop = nil
 
 -- Called at the beginning to load the game
 function love.load()
+
+  SnowFlake.loadImages()
 
   if PROFILING_ENABLED then
     GAME.profiler:start()
@@ -191,6 +194,8 @@ end
 -- dt is the amount of time in seconds that has passed.
 function love.update(dt)
 
+  SnowFlake.updateFlakes(dt)
+
   if config.show_fps and config.debug_mode then
     if runTimeGraph == nil then
       runTimeGraph = RunTimeGraph()
@@ -283,6 +288,8 @@ function love.draw()
     gfx_q[i][1](unpack(gfx_q[i][2]))
   end
   gfx_q:clear()
+
+  SnowFlake.drawFlakes()
 
   love.graphics.setCanvas() -- render everything thats been added
   love.graphics.clear(love.graphics.getBackgroundColor()) -- clear in preperation for the next render
