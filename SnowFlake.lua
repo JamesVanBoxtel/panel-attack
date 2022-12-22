@@ -3,27 +3,38 @@ local logger = require("logger")
 local snowImages = {}
 local snowflakes = {} -- this will hold all flakes
 local snowSpawnTimer = 0
-local maxSnowFlakes = 5000
-local snowFlakesPerSecond = 600
+local maxSnowFlakes = 10000
+local snowFlakesPerSecond = 2000
 local snowFlakeSpawnSpeed = 1 / snowFlakesPerSecond -- a snow flake is created once every this amount of seconds
 
-local peakWindDepth = 0 -- the depth that has the most 'wind' which cause more x movement
-local minWindSpeed = 0
-local maxWindSpeed = 300
+local minSnowIntensity = 0.05
+local maxSnowIntensity = 1
+local snowIntensity = ((maxSnowIntensity - minSnowIntensity) / 2) + minSnowIntensity
+local snowIntensityVelocity = 0.8
+local minSnowIntensityVelocity = -0.05
+local maxSnowIntensityVelocity = 0.05
+local snowIntensityVelocityChangePerSecond = 0.05
+
+local peakWindDepth = 0.5 -- the depth that has the most 'wind' which cause more x movement
+local peakWindDepthVelocity = 0
+local minWindSpeedVelocity = -20
+local maxWindSpeedVelocity = 20
+local minWindSpeed = -100
+local maxWindSpeed = 200
 local maxWindChangePerSecond = 0.2
-local maxWindSpeedChangePerSecond = 100
+local maxWindSpeedChangePerSecond = 10
 local windSpeedVelocity = 0
-local windSpeed = maxWindSpeed / 2
+local windSpeed = ((maxWindSpeed - minWindSpeed) / 2) + minWindSpeed
 
 local minDX = 0
 local maxDX = 100
-local maxScale = 1/8
+local maxScale = 1/4
 
 local maxX = 1280
 local maxY = 720
 
 local function pickRandomScale()
-  local randomValue = math.random()
+  local randomValue = love.math.random()
   local maxSize = 6
   local scalePick = maxSize
   if randomValue < 0.7 then
@@ -37,7 +48,7 @@ local function pickRandomScale()
   elseif randomValue < 0.995 then
     scalePick = 5
   end
-  local scale = scalePick / maxSize * maxScale
+  local scale = scalePick / maxSize * snowIntensity * maxScale
   return scale
 end
 
@@ -49,7 +60,7 @@ SnowFlake =
     local percentScale = (scale / maxScale)
     local percentScaleInverted = 1 - percentScale
     local dx = (maxDX - minDX) / 2 + minDX --love.math.random(minDX, maxDX)
-    local depth = 0.5 -- math.random()
+    local depth = love.math.random()
     local dy = (percentScaleInverted ^ 1.5) * 40 + (depth * 120) + 60
 
     self.flakeImageIndex = love.math.random(1, 8) -- image to use
@@ -62,7 +73,7 @@ SnowFlake =
     self.depth = depth
     self.dx = dx
     self.dy = dy
-    self.alpha = math.random() * 0.2 + 0.5
+    self.alpha = love.math.random() * 0.2 + 0.5 + .3 * snowIntensity
   end
 )
 
@@ -84,18 +95,56 @@ function SnowFlake.peakWindDepth()
   return peakWindDepth
 end
 
-function SnowFlake.updateWind(dt)
-  local peakWindChange = ((math.random() * maxWindChangePerSecond * 2) - maxWindChangePerSecond) * dt
-  peakWindDepth = peakWindDepth + peakWindChange
-  while peakWindDepth < 0 do
-    peakWindDepth = peakWindDepth + 1
-  end
-  if peakWindDepth > 1 then
-    peakWindDepth = peakWindDepth % 1
-  end
+function SnowFlake.windSpeedVelocity()
+  return windSpeedVelocity
+end
 
-  local windSpeedChange = ((math.random() * maxWindSpeedChangePerSecond * 2) - maxWindSpeedChangePerSecond) * dt
-  windSpeed = windSpeed + windSpeedChange
+function SnowFlake.peakWindDepthVelocity()
+  return peakWindDepthVelocity
+end
+
+function SnowFlake.snowIntensity()
+  return snowIntensity
+end
+
+function SnowFlake.snowIntensityVelocity()
+  return snowIntensityVelocity
+end
+
+function SnowFlake.randomizeIntensity(seed)
+  love.math.setRandomSeed(seed)
+  snowIntensity = love.math.random() * (maxSnowIntensity - minSnowIntensity) + minSnowIntensity
+end
+
+function SnowFlake.updateIntensity(dt)
+  local change = ((love.math.random() * snowIntensityVelocityChangePerSecond * 2) - snowIntensityVelocityChangePerSecond) * dt
+  snowIntensityVelocity = snowIntensityVelocity + change
+  snowIntensityVelocity = math.min(snowIntensityVelocity, maxSnowIntensityVelocity)
+  snowIntensityVelocity = math.max(snowIntensityVelocity, minSnowIntensityVelocity)
+
+  snowIntensity = snowIntensity + snowIntensityVelocity * dt
+  snowIntensity = math.min(snowIntensity, maxSnowIntensity)
+  snowIntensity = math.max(snowIntensity, minSnowIntensity)
+end
+
+function SnowFlake.updateWind(dt)
+  local currentWindIntensity = snowIntensity
+  local peakWindChange = ((currentWindIntensity * maxWindChangePerSecond * 2) - maxWindChangePerSecond) * dt
+
+  peakWindDepthVelocity = peakWindDepthVelocity + peakWindChange
+  peakWindDepthVelocity = math.min(peakWindDepthVelocity, 0.2)
+  peakWindDepthVelocity = math.max(peakWindDepthVelocity, -0.2)
+
+  peakWindDepth = peakWindDepth + peakWindDepthVelocity * dt
+  peakWindDepth = math.min(peakWindDepth, 1)
+  peakWindDepth = math.max(peakWindDepth, 0)
+
+  local windSpeedChange = ((currentWindIntensity * maxWindSpeedChangePerSecond * 2) - maxWindSpeedChangePerSecond) * dt
+  windSpeedVelocity = windSpeedVelocity + windSpeedChange 
+  windSpeedVelocity = math.min(windSpeedVelocity, maxWindSpeedVelocity)
+  windSpeedVelocity = math.max(windSpeedVelocity, minWindSpeedVelocity)
+
+  windSpeed = windSpeed + windSpeedVelocity * dt
   windSpeed = math.min(windSpeed, maxWindSpeed)
   windSpeed = math.max(windSpeed, minWindSpeed)
 end
@@ -104,6 +153,7 @@ function SnowFlake.updateFlakes(dt)
 
 	snowSpawnTimer = snowSpawnTimer + dt
 
+  SnowFlake.updateIntensity(dt)
   SnowFlake.updateWind(dt)
 
 	for x = #snowflakes, 1, -1 do --iterate over all snowflakes, updating...
@@ -113,15 +163,16 @@ function SnowFlake.updateFlakes(dt)
 			table.remove(snowflakes, x)
 		end
 	end
-	while #snowflakes < maxSnowFlakes and snowSpawnTimer > snowFlakeSpawnSpeed do
-    snowSpawnTimer = snowSpawnTimer - snowFlakeSpawnSpeed
+  local currentSnowFlakeSpawnSpeed = snowFlakeSpawnSpeed / snowIntensity
+	while #snowflakes < maxSnowFlakes and snowSpawnTimer > currentSnowFlakeSpawnSpeed do
+    snowSpawnTimer = snowSpawnTimer - currentSnowFlakeSpawnSpeed
 	  snowflakes[#snowflakes + 1] = SnowFlake()
 	end
 end
 
 function SnowFlake:update(dt)
   local depthDistance = math.abs(peakWindDepth - self.depth)
-  local dxChange = windSpeed * depthDistance
+  local dxChange = windSpeed * depthDistance * dt
   self.dx = self.dx + dxChange
   self.dx = math.min(self.dx, maxDX)
   self.dx = math.max(self.dx, minDX)

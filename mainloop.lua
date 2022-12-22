@@ -452,6 +452,8 @@ end
 
 local function runMainGameLoop(updateFunction, variableStepFunction, abortGameFunction, processGameResultsFunction)
 
+  SnowFlake.randomizeIntensity(GAME.match.seed)
+
   local returnFunction = nil
   while true do
     -- Uncomment this to cripple your game :D
