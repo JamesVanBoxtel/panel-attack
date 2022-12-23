@@ -40,34 +40,34 @@ Theme =
     self.font = {} -- font
     self.matchtypeLabel_Pos = {-40, -30} -- the position of the "match type" label
     self.matchtypeLabel_Scale = 3 -- the scale size of the "match type" lavel
-    self.timeLabel_Pos = {0, 10} -- the position of the timer label
+    self.timeLabel_Pos = {-4, 2} -- the position of the timer label
     self.timeLabel_Scale = 2 -- the scale size of the timer label
-    self.time_Pos = {-40, 25} -- the position of the timer
-    self.time_Scale = 1 -- the scale size of the timer
+    self.time_Pos = {26, 26} -- the position of the timer
+    self.time_Scale = 2 -- the scale size of the timer
     self.name_Pos = {20, -30} -- the position of the name
-    self.moveLabel_Pos = {465, 170} -- the position of the move label
+    self.moveLabel_Pos = {468, 170} -- the position of the move label
     self.moveLabel_Scale = 2 -- the scale size of the move label
-    self.move_Pos = {20, 35} -- the position of the move
+    self.move_Pos = {40, 34} -- the position of the move
     self.move_Scale = 1 -- the scale size of the move
-    self.scoreLabel_Pos = {102, 25} -- the position of the score label
+    self.scoreLabel_Pos = {104, 25} -- the position of the score label
     self.scoreLabel_Scale = 2 -- the scale size of the score label
-    self.score_Pos = {108, 31} -- the position of the score
-    self.score_Scale = 1.31 -- the scale size of the score
-    self.speedLabel_Pos = {104, 42} -- the position of the speed label
+    self.score_Pos = {116, 32} -- the position of the score
+    self.score_Scale = 1.5 -- the scale size of the score
+    self.speedLabel_Pos = {106, 42} -- the position of the speed label
     self.speedLabel_Scale = 2 -- the scale size of the speed label
-    self.speed_Pos = {108, 48} -- the position of the speed
+    self.speed_Pos = {116, 48} -- the position of the speed
     self.speed_Scale = 1.35 -- the scale size of the speed
-    self.levelLabel_Pos = {101, 59} -- the position of the level label
+    self.levelLabel_Pos = {104, 58} -- the position of the level label
     self.levelLabel_Scale = 2 -- the scale size of the level label
-    self.level_Pos = {110, 65} -- the position of the level
+    self.level_Pos = {112, 66} -- the position of the level
     self.level_Scale = 1 -- the scale size of the level
     self.winLabel_Pos = {10, 190} -- the position of the win label
     self.winLabel_Scale = 2 -- the scale size of the win label
-    self.win_Pos = {20, 220} -- the position of the win counter
-    self.win_Scale = 1 -- the scale size of the win counter
+    self.win_Pos = {40, 220} -- the position of the win counter
+    self.win_Scale = 2 -- the scale size of the win counter
     self.ratingLabel_Pos = {5, 140} -- the position of the rating label
     self.ratingLabel_Scale = 2 -- the scale size of the rating label
-    self.rating_Pos = {25, 160} -- the position of the rating value
+    self.rating_Pos = {38, 160} -- the position of the rating value
     self.rating_Scale = 1 -- the scale size of the rating value
     self.spectators_Pos = {547, 460} -- the position of the spectator list
     self.healthbar_frame_Pos = {-17, -4} -- the position of the healthbar frame
@@ -212,13 +212,22 @@ function Theme.graphics_init(self)
   for i = 4, 66 do
     self.images.IMG_cards[false][i] = load_theme_img("combo/combo" .. tostring(math.floor(i / 10)) .. tostring(i % 10) .. "")
   end
+  -- mystery chain
+  self.images.IMG_cards[true][0] = load_theme_img("chain/chain00")
   for i = 2, 13 do
+    -- with backup from default theme
     self.images.IMG_cards[true][i] = load_theme_img("chain/chain" .. tostring(math.floor(i / 10)) .. tostring(i % 10) .. "")
   end
-
-  self.images.IMG_cards[true][14] = load_theme_img("chain/chain00")
-  for i = 15, 99 do
-    self.images.IMG_cards[true][i] = self.images.IMG_cards[true][14]
+  -- load as many more chain cards as there are available until 99, we will substitue in the mystery card if a card is missing
+  self.chainCardLimit = 99
+  for i = 14, 99 do
+    -- without backup from default theme
+    self.images.IMG_cards[true][i] = load_theme_img("chain/chain" .. tostring(math.floor(i / 10)) .. tostring(i % 10) .. "", false)
+    if self.images.IMG_cards[true][i] == nil then
+      self.images.IMG_cards[true][i] = self.images.IMG_cards[true][0]
+      self.chainCardLimit = i - 1
+      break
+    end
   end
 
   local MAX_SUPPORTED_PLAYERS = 2
@@ -256,13 +265,13 @@ function Theme.graphics_init(self)
     for position_num = 1, 2 do
       local cur_width, cur_height = self.images.IMG_char_sel_cursors[player_num][position_num]:getDimensions()
       local half_width, half_height = cur_width / 2, cur_height / 2 -- TODO: is these unused vars an error ??? -Endu
-      self.images.IMG_char_sel_cursor_halves["left"][player_num][position_num] = love.graphics.newQuad(0, 0, half_width, cur_height, cur_width, cur_height)
+      self.images.IMG_char_sel_cursor_halves["left"][player_num][position_num] = GraphicsUtil:newRecycledQuad(0, 0, half_width, cur_height, cur_width, cur_height)
     end
     self.images.IMG_char_sel_cursor_halves.right[player_num] = {}
     for position_num = 1, 2 do
       local cur_width, cur_height = self.images.IMG_char_sel_cursors[player_num][position_num]:getDimensions()
       local half_width, half_height = cur_width / 2, cur_height / 2
-      self.images.IMG_char_sel_cursor_halves.right[player_num][position_num] = love.graphics.newQuad(half_width, 0, half_width, cur_height, cur_width, cur_height)
+      self.images.IMG_char_sel_cursor_halves.right[player_num][position_num] = GraphicsUtil:newRecycledQuad(half_width, 0, half_width, cur_height, cur_width, cur_height)
     end
   end
 
@@ -344,6 +353,7 @@ function Theme.json_init(self)
   local config_file, err = love.filesystem.newFile("themes/" .. config.theme .. "/config.json", "r")
   if config_file then
     local teh_json = config_file:read(config_file:getSize())
+    config_file:close()
     for k, v in pairs(json.decode(teh_json)) do
       read_data[k] = v
     end
