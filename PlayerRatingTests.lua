@@ -155,10 +155,48 @@ local function testRealWorldData()
   local latestRatingPeriodFound = nil
   local gameResults = simpleCSV.read("GameResults.csv")
   assert(gameResults)
+
+  local playerData = {}
+
+  local playersFile, err = love.filesystem.newFile("players.txt", "r")
+  if playersFile then
+    local tehJSON = playersFile:read(playersFile:getSize())
+    playersFile:close()
+    playersFile = nil
+    playerData = json.decode(tehJSON) or {}
+  end
+
+  local usedNames = {}
+  local cleanedPlayerData = {}
+  for key, value in pairs(playerData) do
+    ::retryValue::
+    if usedNames[value] ~= nil then
+      value = value .. math.random(1, 9999)
+      goto retryValue
+    end
+    cleanedPlayerData[key] = value
+    usedNames[value] = true
+  end
+
+  local function mappedPublicID(playerID) 
+    local result = nil
+    local stringID = tostring(playerID)
+    if cleanedPlayerData[stringID] then
+      result = cleanedPlayerData[stringID]
+    else 
+      while result == nil or usedNames[result] ~= nil do
+        result = "Player" .. tostring(math.random(1, 9999))
+      end
+      cleanedPlayerData[playerID] = result
+      usedNames[result] = true
+    end
+
+    return result
+  end
   
   for row = 1, #gameResults do
-    local player1ID = tonumber(gameResults[row][1])
-    local player2ID = tonumber(gameResults[row][2])
+    local player1ID = mappedPublicID(gameResults[row][1])
+    local player2ID = mappedPublicID(gameResults[row][2])
     local winResult = tonumber(gameResults[row][3])
     local ranked = tonumber(gameResults[row][4])
     local timestamp = tonumber(gameResults[row][5])
