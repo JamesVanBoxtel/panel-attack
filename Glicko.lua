@@ -179,16 +179,17 @@ function Glicko2:update(matches)
 		g2 = g2:to2()
 	end
 	
+  local convertedMatches = {}
 	for i, match in ipairs(matches) do
 		if match.Version == 1 then
-			matches[i] = match:to2()
+			convertedMatches[i] = match:to2()
 		end
 	end
 
 	-- step 3: compute v
 	local v = 0
 	
-	for j, match in ipairs(matches) do
+	for j, match in ipairs(convertedMatches) do
 		local EValue = E(g2.Rating, match.Rating, match.RD)
 
 		v = v + g(match.RD)^2*EValue*(1 - EValue)
@@ -199,7 +200,7 @@ function Glicko2:update(matches)
 	-- step 4: compute delta
 	local delta = 0
 
-	for j, match in ipairs(matches) do
+	for j, match in ipairs(convertedMatches) do
 		local EValue = E(g2.Rating, match.Rating, match.RD)
 
 		delta = delta + g(match.RD)*(match.Score - EValue)
@@ -238,7 +239,7 @@ function Glicko2:update(matches)
 		local C = A + (A - B)*fA/(fB - fA)
 		local fC = bigf(C)
 
-		if fC*fB < 0 then
+		if fC*fB <= 0 then
 			A = B
 			fA = fB
 		else
@@ -252,7 +253,7 @@ function Glicko2:update(matches)
 	-- step 5.5: set new volatility
 	local newVol = g2.Vol
 
-	if #matches > 0 then
+	if #convertedMatches > 0 then
 		newVol = exp(A/2)
 	end
 
@@ -264,9 +265,9 @@ function Glicko2:update(matches)
 	local newRD = 1/sqrt(1/ratingDeviation^2 + 1/v)
 	local newRating = g2.Rating
 
-	if #matches > 0 then
+	if #convertedMatches > 0 then
 		local accumulation = 0
-		for j, match in ipairs(matches) do
+		for j, match in ipairs(convertedMatches) do
 			local EValue = E(g2.Rating, match.Rating, match.RD)
 			accumulation = accumulation + g(match.RD)*(match.Score - EValue)
 		end
@@ -291,6 +292,29 @@ function Glicko2:deviation(deviations)
 	return self.Rating - radius, self.Rating + radius
 end
 
+function Glicko2:expectedOutcome(otherGlicko)
+  local g2 = self
+  local otherGlicko2 = otherGlicko
+
+	-- convert ratings to glicko2
+	if g2.Version == 1 then
+		g2 = g2:to2()
+	end
+	if otherGlicko2.Version == 1 then
+		otherGlicko2 = otherGlicko2:to2()
+	end
+
+  local function A(glicko1, glicko2)
+    return g(sqrt(glicko1.RD^2+glicko2.RD^2)) * (glicko2.Rating-glicko1.Rating)
+  end
+
+  local function myFunc(glicko1, glicko2)
+    return 1/(1 + exp(-A(glicko1, glicko2)))
+  end
+
+  local result = myFunc(otherGlicko2, g2)
+  return result
+end
 
 function Glicko2:range(padding)
 	padding = padding or 0
