@@ -31,7 +31,13 @@ function flush_socket()
   return true
 end
 
-function close_socket()
+function resetNetwork()
+  logged_in = 0
+  connection_up_time = 0
+  GAME.connected_server_ip = ""
+  GAME.connected_network_port = nil
+  current_server_supports_ranking = false
+  match_type = ""
   if TCP_sock then
     TCP_sock:close()
   end
@@ -265,7 +271,7 @@ function send_error_report(errorData)
   TCP_sock:settimeout(0)
   local errorFull = { error_report = errorData }
   json_send(errorFull)
-  close_socket()
+  resetNetwork()
   return true
 end
 
@@ -303,13 +309,13 @@ end
 
 function Stack.handle_input_taunt(self)
 
-  if player_taunt_up(self.which) and self:can_taunt() and #characters[self.character].sounds.taunt_ups > 0 then
-    self.taunt_up = math.random(#characters[self.character].sounds.taunt_ups)
+  if player_taunt_up(self.which) and self:can_taunt() and #characters[self.character].sounds.taunt_up > 0 then
+    self.taunt_up = math.random(#characters[self.character].sounds.taunt_up)
     if TCP_sock then
       json_send({taunt = true, type = "taunt_ups", index = self.taunt_up})
     end
-  elseif player_taunt_down(self.which) and self:can_taunt() and #characters[self.character].sounds.taunt_downs > 0 then
-    self.taunt_down = math.random(#characters[self.character].sounds.taunt_downs)
+  elseif player_taunt_down(self.which) and self:can_taunt() and #characters[self.character].sounds.taunt_down > 0 then
+    self.taunt_down = math.random(#characters[self.character].sounds.taunt_down)
     if TCP_sock then
       json_send({taunt = true, type = "taunt_downs", index = self.taunt_down})
     end
@@ -322,7 +328,7 @@ end
 
 function Stack.send_controls(self)
 
-  if self.is_local and TCP_sock and string.len(self.confirmedInput) > 0 and self.garbage_target and string.len(self.garbage_target.confirmedInput) == 0 then
+  if self.is_local and TCP_sock and #self.confirmedInput > 0 and self.garbage_target and #self.garbage_target.confirmedInput == 0 then
     -- Send 1 frame at CLOCK time 0 then wait till we get our first input from the other player.
     -- This will cause a player that got the start message earlierer than the other player to wait for the other player just once.
     return

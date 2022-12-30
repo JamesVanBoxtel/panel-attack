@@ -1,4 +1,5 @@
 json = require("dkjson")
+require("util")
 require("consts")
 
 -- Default configuration values
@@ -56,13 +57,14 @@ config = {
   
     -- True if we immediately want to maximize the screen on startup
     maximizeOnStartup             = true,
-  
+    gameScaleType                 = "auto",
+    gameScaleFixedValue           = 2,
+
     -- Love configuration variables
     windowWidth                   = canvas_width,
     windowHeight                  = canvas_height,
     borderless                    = false,
     fullscreen                    = false,
-    vsync                         = 1,
     display                       = 1,
     windowX                       = nil,
     windowY                       = nil,
@@ -94,6 +96,7 @@ config = {
         file:open("r")
         local read_data = {}
         local teh_json = file:read(file:getSize())
+        file:close()
         for k, v in pairs(json.decode(teh_json)) do
           read_data[k] = v
         end
@@ -204,6 +207,12 @@ config = {
         if type(read_data.maximizeOnStartup) == "boolean" then
           configTable.maximizeOnStartup = read_data.maximizeOnStartup
         end
+        if type(read_data.gameScaleType) == "string" then
+          configTable.gameScaleType = read_data.gameScaleType
+        end
+        if type(read_data.gameScaleFixedValue) == "number" then
+          configTable.gameScaleFixedValue = read_data.gameScaleFixedValue
+        end
   
         if type(read_data.windowWidth) == "number" then
           configTable.windowWidth = read_data.windowWidth
@@ -216,9 +225,6 @@ config = {
         end
         if type(read_data.fullscreen) == "boolean" then
           configTable.fullscreen = read_data.fullscreen
-        end
-        if type(read_data.vsync) == "boolean" then
-          configTable.vsync = read_data.vsync
         end
         if type(read_data.display) == "number" then
           configTable.display = read_data.display
@@ -238,8 +244,6 @@ config = {
         if type(read_data.windowY) == "number" then
           configTable.windowY = read_data.windowY
         end
-  
-        file:close()
       end
     )
   end

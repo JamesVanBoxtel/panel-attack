@@ -9,7 +9,6 @@ UpdatingImage =
     self.image = image
     self.tiled = tiled
     self.image:setWrap("repeat", "repeat")
-    self.image:setFilter("linear", "linear")
     self.speedX = speedX or 0
     self.speedY = speedY or 0
     self.width = width or self.image:getWidth()
@@ -18,7 +17,7 @@ UpdatingImage =
     self.quad = nil
     if self.tiled then
       -- note how the Quad's width and height are larger than the image width and height.
-      self.quad = love.graphics.newQuad(0, 0, self.width, self.height, self.image:getDimensions())
+      self.quad = GraphicsUtil:newRecycledQuad(0, 0, self.width, self.height, self.image:getDimensions())
     end
   end
 )
