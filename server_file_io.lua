@@ -5,7 +5,7 @@ local logger = require("logger")
 function makeDirectory(path) 
   local status, error = pcall(
     function()
-      lfs.mkdir(path)
+      love.filesystem.createDirectory(path)
     end
   )
   if not status then
