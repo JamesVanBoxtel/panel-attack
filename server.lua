@@ -1618,6 +1618,8 @@ function love.update(dt)
   if TCP_NODELAY_ENABLED then
     server_socket:setoption("tcp-nodelay", true)
   end
+
+  -- Accept any new connections to the server
   local new_conn = server_socket:accept()
   if new_conn then
     new_conn:settimeout(0)
@@ -1626,6 +1628,8 @@ function love.update(dt)
     end
     Connection(new_conn)
   end
+
+  -- Read from all the active connections
   local recvt = {server_socket}
   for _, v in pairs(connections) do
     recvt[#recvt + 1] = v.socket
@@ -1637,17 +1641,22 @@ function love.update(dt)
       connections[socket_to_idx[v]]:read()
     end
   end
+
+  -- Only check once a second to avoid over checking
+  -- (we are relying on time() returning a number rounded to the second)
   local now = time()
   if now ~= prev_now then
+    -- Check all active connections to make sure they have responded timely
     for _, v in pairs(connections) do
       if now - v.last_read > 10 then
-        logger.debug("about to close connection for " .. (v.name or "nil") .. ". Connection timed out (>10 sec)")
+        logger.debug("Closing connection for " .. (v.name or "nil") .. ". Connection timed out (>10 sec)")
         v:close()
       elseif now - v.last_read > 1 then
-        v:send("ELOL")
+        v:send("ELOL") -- Request a ping to make sure the connection is still active
       end
     end
     
+    -- Flush the log so we can see new info periodically. The default caches for huge amounts of time.
     if now - lastFlushTime > 60 then
       pcall(
         function()
@@ -1659,5 +1668,7 @@ function love.update(dt)
 
     prev_now = now
   end
+
+  -- If the lobby changed tell everyone
   broadcast_lobby()
 end
