@@ -2,14 +2,16 @@ require("class")
 socket = require("socket")
 GAME = require("game")
 require("match")
+local manualGC = require("libraries.batteries.manual_gc")
+local RunTimeGraph = require("RunTimeGraph")
 require("BattleRoom")
 require("util")
 require("table_util")
-require("consts")
+local consts = require("consts")
 require("FileUtil")
 require("queue")
 require("globals")
-require("character") -- after globals!
+require("character_loader") -- after globals!
 require("stage") -- after globals!
 require("save")
 require("engine/GarbageQueue")
