@@ -51,4 +51,4 @@ local input_delta = 0.0
 local pointer_hidden = false
 local mainloop = nil
 
-require("server")
+require("server.server")
