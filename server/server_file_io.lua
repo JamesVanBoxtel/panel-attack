@@ -55,7 +55,7 @@ end
 function logGameResult(player1ID, player2ID, player1Won, rankedValue)
   local status, error = pcall(
     function()
-      local f = assert(io.open("RankedGameResults.csv", "a"))
+      local f = io.open("RankedGameResults.csv", "a")
       io.output(f)
       io.write(player1ID .. "," .. player2ID .. "," .. player1Won .. "," .. rankedValue .. "," .. os.time() .. "\n")
       io.close(f)
@@ -70,7 +70,7 @@ end
 function logGameResult(player1ID, player2ID, player1Won, rankedValue)
   local status, error = pcall(
     function()
-      local f = assert(io.open("GameResults.csv", "a"))
+      local f = io.open("GameResults.csv", "a")
       io.output(f)
       io.write(player1ID .. "," .. player2ID .. "," .. player1Won .. "," .. rankedValue .. "," .. os.time() .. "\n")
       io.close(f)
@@ -84,7 +84,7 @@ end
 function write_deleted_players_file()
   local status, error = pcall(
     function()
-      local f = assert(io.open("deleted_players.txt", "w"))
+      local f = io.open("deleted_players.txt", "w")
       io.output(f)
       io.write(json.encode(playerbase.players))
       io.close(f)
@@ -117,7 +117,7 @@ function write_error_report(error_report_json)
   local filename = "v" .. (error_report_json.engine_version or "000") .. "-" .. string.format("%04d-%02d-%02d-%02d-%02d-%02d", now.year, now.month, now.day, now.hour, now.min, now.sec) .. "_" .. (error_report_json.name or "Unknown") .. "-ErrorReport.json"
   return pcall(
     function()
-      local f = assert(io.open("reports" .. sep .. filename, "w"))
+      local f = (io.open("reports" .. sep .. filename, "w"))
       io.output(f)
       io.write(json_string)
       io.close(f)
@@ -128,7 +128,7 @@ end
 function write_leaderboard_file()
   local status, error = pcall(
     function()
-      -- local f = assert(io.open("leaderboard.txt", "w"))
+      -- local f = (io.open("leaderboard.txt", "w"))
       -- io.output(f)
       -- io.write(json.encode(leaderboard.players))
       -- io.close(f)
@@ -269,7 +269,7 @@ function write_replay_file(replay, path, filename)
   local status, error = pcall(
     function()
       makeDirectoryRecursive(path)
-      local f = assert(io.open(path .. sep .. filename, "w"))
+      local f = io.open(path .. sep .. filename, "w")
       io.output(f)
       io.write(json.encode(replay))
       io.close(f)
