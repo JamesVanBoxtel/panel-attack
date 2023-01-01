@@ -51,4 +51,11 @@ local input_delta = 0.0
 local pointer_hidden = false
 local mainloop = nil
 
-require("server.server")
+local server = nil
+function love.load()
+  server = require("server.server")
+end
+
+function love.update(dt)
+  server:update()
+end
