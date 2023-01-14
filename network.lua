@@ -327,6 +327,7 @@ function Stack.idleInput(self)
 end
 
 local waitClock = 0
+local bufferedToSend = nil
 function Stack.send_controls(self)
 
   if self.is_local and TCP_sock and #self.confirmedInput > 0 and self.garbage_target and #self.garbage_target.confirmedInput == 0 then
@@ -335,6 +336,7 @@ function Stack.send_controls(self)
     return
   end
 
+  local idleInput = self:idleInput()
   local playerNumber = self.which
 
   waitClock = waitClock + 1
@@ -349,15 +351,20 @@ function Stack.send_controls(self)
     ]
 
   if GAME.TASMode then
+    -- Restore the buffered to send if we were blocked last frame
+    if to_send == idleInput and bufferedToSend ~= nil then
+      to_send = bufferedToSend
+      bufferedToSend = nil
+    end
+
     if self.framesSinceInput < GAME.TASIdles then
       -- The player isn't allowed inputs until TAS Idle count is reached
-      to_send = self:idleInput()
+      bufferedToSend = to_send
+      to_send = idleInput
       self.framesSinceInput = self.framesSinceInput + 1
-    elseif self.framesSinceInput < GAME.TASSpeed then
-      -- If the player didn't do input in TAS mode we won't advance.
-      if playerDidInput(playerNumber) == false then
-        return
-      end
+    elseif to_send == idleInput and waitClock % GAME.TASSpeed ~= 0 then
+      -- The player didn't do any input and its not time to force advance yet. Don't advance the stack.
+      return
     end
   end
 
@@ -372,7 +379,7 @@ function Stack.send_controls(self)
 
   self:receiveConfirmedInput(to_send)
   
-  if to_send ~= self:idleInput() then
+  if to_send ~= idleInput then
     self.framesSinceInput = 0
   end
 end

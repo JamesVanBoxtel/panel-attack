@@ -731,21 +731,6 @@ advance_input =
   nil
 )
 
-function playerDidInput(playerNumber)
-  if player_raise(playerNumber) or 
-     player_swap(playerNumber) or
-     player_up_once(playerNumber) or
-     player_down_once(playerNumber) or
-     player_left_once(playerNumber) or
-     player_right_once(playerNumber) or
-     advance_input(playerNumber) or
-     retry_input(playerNumber) then
-       return true
-  end
-
-  return false
-end
-
 -- returns true if the user input to exit a local game in progress
 function menu_escape_game()
   if GAME.gameIsPaused and menu_escape() then
