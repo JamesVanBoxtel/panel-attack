@@ -456,7 +456,7 @@ local function input_key_func(fixed, configurable, query, sound, ...)
       for _, inputConfiguration in ipairs(input:getInputConfigurationsForPlayerNumber(playerNumber)) do
         local keyname = inputConfiguration[configurable[i]]
         if keyname then
-          res = res or query(keyname, other_args) and not menu_reserved_keys[keyname]
+          res = res or query(keyname, other_args)
         end
       end
     end
@@ -727,7 +727,7 @@ advance_input =
   input_key_func(
   {},
   {"taunt_up"},
-  repeating_key,
+  normal_key,
   nil
 )
 

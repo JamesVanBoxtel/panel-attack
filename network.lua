@@ -327,7 +327,16 @@ function Stack.idleInput(self)
 end
 
 local waitClock = 0
-local bufferedToSend = nil
+function Stack:idleStackAllowed()
+  local result = true
+  if GAME.TASMode then
+    if GAME.TASSpeed ~= nil then
+      result = waitClock % GAME.TASSpeed ~= 0
+    end
+  end
+  return result
+end
+
 function Stack.send_controls(self)
 
   if self.is_local and TCP_sock and #self.confirmedInput > 0 and self.garbage_target and #self.garbage_target.confirmedInput == 0 then
@@ -351,20 +360,35 @@ function Stack.send_controls(self)
     ]
 
   if GAME.TASMode then
-    -- Restore the buffered to send if we were blocked last frame
-    if to_send == idleInput and bufferedToSend ~= nil then
-      to_send = bufferedToSend
-      bufferedToSend = nil
-    end
-
     if self.framesSinceInput < GAME.TASIdles then
       -- The player isn't allowed inputs until TAS Idle count is reached
-      bufferedToSend = to_send
+
+      -- buffer their input if they made one
+      local raising = player_raise(playerNumber)
+      if raising == nil then
+        raising = false
+      end
+      if to_send ~= idleInput and raising == false then
+        self.bufferedToSend[#self.bufferedToSend+1]  = to_send
+      end
+
       to_send = idleInput
       self.framesSinceInput = self.framesSinceInput + 1
-    elseif to_send == idleInput and waitClock % GAME.TASSpeed ~= 0 then
-      -- The player didn't do any input and its not time to force advance yet. Don't advance the stack.
-      return
+    else
+
+      -- Restore the buffered to send if we were blocked last frame
+      if to_send == idleInput and #self.bufferedToSend > 0 then
+        to_send = table.remove(self.bufferedToSend, 1)
+      end
+
+      local playerWantsAdvanceAnyways = advance_input(1)
+      if playerWantsAdvanceAnyways == nil then
+        playerWantsAdvanceAnyways = false
+      end
+      if playerWantsAdvanceAnyways == false and to_send == idleInput and self:idleStackAllowed() then
+        -- The player didn't do any input and its not time to force advance yet. Don't advance the stack.
+        return
+      end
     end
   end
 

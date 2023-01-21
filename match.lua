@@ -219,7 +219,7 @@ function Match:run()
     P2:send_controls()
   end
 
-  if retry_input(1) and P1.CLOCK > 60 and GAME.rewindAllowed then
+  if retry_input(1) and P1.CLOCK > 60 and GAME.TASMode then
     P1:rollbackToFrame(P1.CLOCK - 60)
     P1.input_buffer = ""
     P1.confirmedInput = string.sub(P1.confirmedInput, 1, P1.CLOCK+1)

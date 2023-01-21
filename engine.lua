@@ -166,6 +166,7 @@ Stack =
     s.taunt_queue = Queue()
 
     s.framesSinceInput = 0
+    s.bufferedToSend = {}
     s.cur_wait_time = config.input_repeat_delay -- number of ticks to wait before the cursor begins
     -- to move quickly... it's based on P1CurSensitivity
     s.cur_timer = 0 -- number of ticks for which a new direction's been pressed
@@ -535,18 +536,16 @@ function Stack.saveForRollback(self)
   prev_states[self.CLOCK] = Stack.rollbackCopy(self)
   self.prev_states = prev_states
   self.garbage_target = garbage_target
-  
-  if not isReplay and not GAME.rewindAllowed then
-    local deleteFrame = self.CLOCK - MAX_LAG - 1
-    if prev_states[deleteFrame] then
-      Telegraph.saveClone(prev_states[deleteFrame].telegraph)
 
-      -- Has a reference to stacks we don't want kept around
-      prev_states[deleteFrame].telegraph = nil
+  local deleteFrame = self.CLOCK - MAX_LAG - 1
+  if prev_states[deleteFrame] then
+    Telegraph.saveClone(prev_states[deleteFrame].telegraph)
 
-      clone_pool[#clone_pool + 1] = prev_states[deleteFrame]
-      prev_states[deleteFrame] = nil
-    end
+    -- Has a reference to stacks we don't want kept around
+    prev_states[deleteFrame].telegraph = nil
+
+    clone_pool[#clone_pool + 1] = prev_states[deleteFrame]
+    prev_states[deleteFrame] = nil
   end
 end
 
