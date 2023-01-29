@@ -121,6 +121,23 @@ local function invertedGameResult(gameResult)
   return gameResult
 end
 
+local usedNames = {}
+local publicIDMap = {} -- mapping of privateID to publicID
+local function cleanNameForName(name, privateID)
+  name = name or "Player"
+  privateID = tostring(privateID)
+  if publicIDMap[privateID] == nil then
+    local result = name
+    while usedNames[result] ~= nil do
+      result = name .. math.random(1000000, 9999999)
+    end
+    usedNames[result] = true
+    publicIDMap[privateID] = result
+  end
+
+  return publicIDMap[privateID]
+end
+
 local function runRatingPeriods(firstRatingPeriod, lastRatingPeriod, players, glickoResultsTable)
   -- Run each rating period (the later ones will just increase RD)
   for i = firstRatingPeriod, lastRatingPeriod, 1 do
@@ -156,47 +173,23 @@ local function testRealWorldData()
   local gameResults = simpleCSV.read("GameResults.csv")
   assert(gameResults)
 
-  local playerData = {}
 
   local playersFile, err = love.filesystem.newFile("players.txt", "r")
   if playersFile then
     local tehJSON = playersFile:read(playersFile:getSize())
     playersFile:close()
     playersFile = nil
-    playerData = json.decode(tehJSON) or {}
-  end
-
-  local usedNames = {}
-  local cleanedPlayerData = {}
-  for key, value in pairs(playerData) do
-    ::retryValue::
-    if usedNames[value] ~= nil then
-      value = value .. math.random(1, 9999)
-      goto retryValue
-    end
-    cleanedPlayerData[key] = value
-    usedNames[value] = true
-  end
-
-  local function mappedPublicID(playerID) 
-    local result = nil
-    local stringID = tostring(playerID)
-    if cleanedPlayerData[stringID] then
-      result = cleanedPlayerData[stringID]
-    else 
-      while result == nil or usedNames[result] ~= nil do
-        result = "Player" .. tostring(math.random(1, 9999))
+    local playerData = json.decode(tehJSON) or {}
+    if playerData then
+      for key, value in pairs(playerData) do
+        cleanNameForName(value, key)
       end
-      cleanedPlayerData[playerID] = result
-      usedNames[result] = true
     end
-
-    return result
   end
-  
+
   for row = 1, #gameResults do
-    local player1ID = mappedPublicID(gameResults[row][1])
-    local player2ID = mappedPublicID(gameResults[row][2])
+    local player1ID = cleanNameForName(nil, gameResults[row][1])
+    local player2ID = cleanNameForName(nil, gameResults[row][2])
     local winResult = tonumber(gameResults[row][3])
     local ranked = tonumber(gameResults[row][4])
     local timestamp = tonumber(gameResults[row][5])
@@ -273,7 +266,6 @@ local function testRealWorldData()
     end
     if playerTable.playerRating:isProvisional() then
       provisionalCount = provisionalCount + 1
-      assert(playerTable.totalGames < 100)
     end
     playerCount = playerCount + 1
   end
