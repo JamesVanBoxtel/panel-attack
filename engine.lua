@@ -15,6 +15,7 @@ local max = math.max
 local garbage_bounce_time = #garbage_bounce_table
 
 local DT_SPEED_INCREASE = 15 * 60 -- frames it takes to increase the speed level by 1
+local COUNTDOWN_CURSOR_SPEED = 4 --one move every this many frames
 
 -- Represents the full panel stack for one player
 Stack =
@@ -40,7 +41,7 @@ Stack =
     s.character = character
     s.max_health = 1
     s.panels_dir = panels_dir
-    s.portraitFade = 0
+    s.portraitFade = config.portrait_darkness / 100 -- will be set back to 0 if count down happens
     s.is_local = is_local
 
     s.drawsAnalytics = true
@@ -131,7 +132,7 @@ Stack =
 
     s.CLOCK = 0
     s.game_stopwatch = 0
-    s.game_stopwatch_running = false
+    s.game_stopwatch_running = true -- set to false if countdown starts
     s.do_countdown = true
     s.max_runs_per_frame = 3
 
@@ -196,7 +197,6 @@ Stack =
     s.cur_dir = nil -- the direction pressed
     s.cur_row = 7 -- the row the cursor's on
     s.cur_col = 3 -- the column the left half of the cursor's on
-    s.cursorLock = true
     s.queuedSwapColumn = 0 -- the left column of the two columns to swap or 0 if no swap queued
     s.queuedSwapRow = 0 -- the row of the queued swap or 0 if no swap queued
     s.top_cur_row = s.height + (s.match.mode == "puzzle" and 0 or -1)
@@ -437,10 +437,6 @@ function Stack.rollbackCopy(source, other)
   end
 
   other.countdown_CLOCK = source.countdown_CLOCK
-  other.starting_cur_row = source.starting_cur_row
-  other.starting_cur_col = source.starting_cur_col
-  other.countdown_cursor_state = source.countdown_cursor_state
-  other.countdown_cur_speed = source.countdown_cur_speed
   other.countdown_timer = source.countdown_timer
   other.CLOCK = source.CLOCK
   other.game_stopwatch = source.game_stopwatch
@@ -470,7 +466,6 @@ function Stack.rollbackCopy(source, other)
   other.shake_time = source.shake_time
   other.peak_shake_time = source.peak_shake_time
   other.do_countdown = source.do_countdown
-  other.ready_y = source.ready_y  
   other.panel_buffer = source.panel_buffer
   other.gpanel_buffer = source.gpanel_buffer
   other.panelGenCount = source.panelGenCount
@@ -1024,9 +1019,16 @@ function Stack.controls(self)
   if self.inputMethod == "touch" then
     local cursorColumn, cursorRow
     raise, cursorRow, cursorColumn = TouchDataEncoding.latinStringToTouchData(sdata, self.width)
-    if self.cursorLock == false then
+    local canSetCursor = true
+    if self.do_countdown then      
+      if self.animatingCursorDuringCountdown then
+        canSetCursor = false
+      end
+    end
+
+    if canSetCursor then
       if self.cur_col ~= cursorColumn or self.cur_row ~= cursorRow or (cursorColumn == 0 and cursorRow == 0) then
-        -- We moved the cursor from a previous column, swap
+        -- We moved the cursor from a previous column, try to swap
         if self.cur_col ~= 0 and self.cur_row ~= 0 and cursorColumn ~= self.cur_col and cursorRow ~= 0 then
           local swapColumn = math.min(self.cur_col, cursorColumn)
           if self:canSwap(cursorRow, swapColumn) then
@@ -1036,6 +1038,11 @@ function Stack.controls(self)
         self.cur_col = cursorColumn
         self.cur_row = cursorRow
       end
+    end
+
+    -- Make sure we don't set the cursor higher than the top allowed row
+    if self.cur_row > 0 and self.cur_row > self.top_cur_row then
+      self.cur_row = self.top_cur_row
     end
   else --input method is controller
     local swap, up, down, left, right
@@ -1316,69 +1323,8 @@ function Stack.simulate(self)
     local panels = self.panels
     local panel = nil
     local swapped_this_frame = nil
-    if self.do_countdown then
-      self.game_stopwatch_running = false
-      self.rise_lock = true
-      if not self.countdown_cursor_state then
-        self.countdown_CLOCK = self.CLOCK
-        self.starting_cur_row = self.cur_row
-        self.starting_cur_col = self.cur_col
-        self.cur_row = self.height
-        self.cur_col = self.width - 1
-        if self.inputMethod == "touch" then
-          self.cur_col = self.width
-        end
-        self.countdown_cursor_state = "ready_falling"
-        self.countdown_cur_speed = 4 --one move every this many frames
-        self.cursorLock = true
-      end
-      if self.countdown_CLOCK == 8 then
-        self.countdown_cursor_state = "moving_down"
-        self.countdown_timer = 180 --3 seconds at 60 fps
-      elseif self.countdown_cursor_state == "moving_down" then
-        --move down
-        if self.cur_row == self.starting_cur_row then
-          self.countdown_cursor_state = "moving_left"
-        elseif self.CLOCK % self.countdown_cur_speed == 0 then
-          self.cur_row = self.cur_row - 1
-        end
-      elseif self.countdown_cursor_state == "moving_left" then
-        --move left
-        if self.cur_col == self.starting_cur_col then
-          self.countdown_cursor_state = "ready"
-        elseif self.CLOCK % self.countdown_cur_speed == 0 then
-          self.cur_col = self.cur_col - 1
-        end
-      end
-      if self.countdown_timer then
-        if self.countdown_timer == 0 then
-          --we are done counting down
-          self.cursorLock = false
-          self.do_countdown = nil
-          self.countdown_timer = nil
-          self.starting_cur_row = nil
-          self.starting_cur_col = nil
-          self.countdown_CLOCK = nil
-          self.game_stopwatch_running = true
-          if self.which == 1 and self:shouldChangeSoundEffects() then
-            SFX_Go_Play = 1
-          end
-        elseif self.countdown_timer and self.countdown_timer % 60 == 0 and self.which == 1 then
-          --play beep for timer dropping to next second in 3-2-1 countdown
-          if self.which == 1 and self:shouldChangeSoundEffects() then
-            SFX_Countdown_Play = 1
-          end
-        end
-        if self.countdown_timer then
-          self.countdown_timer = self.countdown_timer - 1
-        end
-      end
-      if self.countdown_CLOCK then
-        self.countdown_CLOCK = self.countdown_CLOCK + 1
-      end
-    else 
-      self.game_stopwatch_running = true
-    end
+
+    self:runCountDownIfNeeded()
 
     if self.pre_stop_time ~= 0 then
       self.pre_stop_time = self.pre_stop_time - 1
@@ -1765,11 +1711,10 @@ function Stack.simulate(self)
     if self.inputMethod == "touch" then
         --with touch, cursor movement happen at stack:control time
     else
-      if self.cur_dir and (self.cur_timer == 0 or self.cur_timer == self.cur_wait_time) and not self.cursor_lock then
+      if self.cur_dir and (self.cur_timer == 0 or self.cur_timer == self.cur_wait_time) then
         local prev_row = self.cur_row
         local prev_col = self.cur_col
-        self.cur_row = bound(1, self.cur_row + d_row[self.cur_dir], self.top_cur_row)
-        self.cur_col = bound(1, self.cur_col + d_col[self.cur_dir], self.width - 1)
+        self:moveCursorInDirection(self.cur_dir)
         if (playMoveSounds and (self.cur_timer == 0 or self.cur_timer == self.cur_wait_time) and (self.cur_row ~= prev_row or self.cur_col ~= prev_col)) then
           if self:shouldChangeSoundEffects() then
             SFX_Cur_Move_Play = 1
@@ -2147,6 +2092,71 @@ function Stack.simulate(self)
   self:update_cards()
 end
 
+function Stack:runCountDownIfNeeded()
+  if self.do_countdown then
+    self.game_stopwatch_running = false
+    self.rise_lock = true
+    if not self.countdown_CLOCK then
+      self.countdown_CLOCK = self.CLOCK
+      self.animatingCursorDuringCountdown = true
+      self.cur_row = self.height
+      self.cur_col = self.width - 1
+      if self.inputMethod == "touch" then
+        self.cur_col = self.width
+      end
+    end
+    local COUNTDOWN_LENGTH = 180 --3 seconds at 60 fps
+    if self.countdown_CLOCK == 8 then
+      self.countdown_timer = COUNTDOWN_LENGTH
+    end
+    if self.countdown_timer then
+      local countDownFrame = COUNTDOWN_LENGTH - self.countdown_timer
+      if countDownFrame > 0 and countDownFrame % COUNTDOWN_CURSOR_SPEED == 0 then
+        local moveIndex = math.floor(countDownFrame / COUNTDOWN_CURSOR_SPEED)
+        if moveIndex <= 4 then
+          self:moveCursorInDirection("down")
+        elseif moveIndex <= 6 then
+          self:moveCursorInDirection("left")
+        elseif moveIndex == 10 then
+          self.animatingCursorDuringCountdown = false
+          if self.inputMethod == "touch" then
+            self.cur_row = 0
+            self.cur_col = 0
+          end
+        end
+      end
+      if self.countdown_timer == 0 then
+        --we are done counting down
+        self.do_countdown = false
+        self.countdown_timer = nil
+        self.countdown_CLOCK = nil
+        self.animatingCursorDuringCountdown = nil
+        self.game_stopwatch_running = true
+        if self.which == 1 and self:shouldChangeSoundEffects() then
+          SFX_Go_Play = 1
+        end
+      elseif self.countdown_timer and self.countdown_timer % 60 == 0 and self.which == 1 then
+        --play beep for timer dropping to next second in 3-2-1 countdown
+        if self.which == 1 and self:shouldChangeSoundEffects() then
+          SFX_Countdown_Play = 1
+        end
+      end
+      if self.countdown_timer then
+        self.countdown_timer = self.countdown_timer - 1
+      end
+    end
+    if self.countdown_CLOCK then
+      self.countdown_CLOCK = self.countdown_CLOCK + 1
+    end
+  end
+end
+
+function Stack:moveCursorInDirection(directionString)
+  assert(directionString ~= nil and type(directionString) == "string")
+  self.cur_row = bound(1, self.cur_row + d_row[directionString], self.top_cur_row)
+  self.cur_col = bound(1, self.cur_col + d_col[directionString], self.width - 1)
+end
+
 -- Called on a stack by the attacker with the time to start processing the garbage drop
 function Stack:receiveGarbage(frameToReceive, garbageList)
 
@@ -2332,8 +2342,6 @@ end
 -- returns true if the panel in row/column can be swapped with the panel to its right (column + 1)
 function Stack.canSwap(self, row, column)
   local panels = self.panels
-  local width = self.width
-  local height = self.height
   -- in order for a swap to occur, one of the two panels in
   -- the cursor must not be a non-panel.
   local do_swap =
