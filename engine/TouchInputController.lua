@@ -61,11 +61,13 @@ function TouchInputController:encodedCharacterForCurrentTouchInput()
     end
   end
   
-  self.previousTouchedPanel = deepcpy(self.touchedPanel)
-  self.touchedPanel = {row = rowTouched, col = columnTouched}
+  self.previousTouchedPanel.row = self.touchedPanel.row
+  self.previousTouchedPanel.col = self.touchedPanel.col
+  self.touchedPanel.row = rowTouched
+  self.touchedPanel.col = columnTouched
 
-  local cursorRow, cursorColumn = self:handleSwap()
-  
+  local cursorRow, cursorColumn = self:handleTouch()
+
   local result = TouchDataEncoding.touchDataToLatinString(shouldRaise, cursorRow, cursorColumn, self.stack.width)
   return result
 end
@@ -134,9 +136,6 @@ function TouchInputController:handleTouch()
     -- whatever you touch, nothing shall happen if the cursor is locked
     return 0, 0
   else
-    local cursorColumn = self.stack.cur_col
-    local cursorRow = self.stack.cur_row
-
     -- depending on panel state transformations we may have to undo a lingering touch
     -- if panel at cur_row, cur_col gets certain flags, deselect it, and end the touch
     if self:shouldUnselectPanel() then
@@ -178,11 +177,8 @@ function TouchInputController:handleTouch()
         end
       end
     elseif self:touchOngoing() then
-      if not self:lingeringTouchIsSet() then
-        return self:tryPerformTouchSwap(self.touchedPanel.col)
-      else
-        -- buffered swaps are currently not enabled due to balancing concerns
-      end
+      assert(not self:lingeringTouchIsSet(), "buffered swaps are currently not enabled due to balancing concerns\nmeaning that lingeringTouch should also never be set while a touch is on-going")
+      return self:tryPerformTouchSwap(self.touchedPanel.col)
     elseif self:touchReleased() then
       self.panelFirstTouched.row = 0
       self.panelFirstTouched.col = 0
@@ -193,15 +189,13 @@ function TouchInputController:handleTouch()
 
       return 0, 0
     else
-      -- there is no on-going touch but there may still be a target to swap to
+      -- there is no on-going touch but there may still be a target to swap to from the last release
       if self.touchTargetColumn ~= 0 then
         return self:tryPerformTouchSwap(self.touchTargetColumn)
       end
 
       return 0, 0
     end
-
-    return cursorRow, cursorColumn
   end
 end
 
@@ -221,14 +215,14 @@ end
 
 function TouchInputController:shouldUnselectPanel()
   if (self.stack.cur_row ~= 0 and self.stack.cur_col ~= 0) then
-    return self:panelIsSelectable(self.stack.cur_row, self.stack.cur_col)
+    return not self:panelIsSelectable(self.stack.cur_row, self.stack.cur_col)
   end
   return false
 end
 
 function TouchInputController:panelIsSelectable(row, column)
   local panel = self.stack.panels[row][column]
-  if panel.garbage == false and
+  if not panel.garbage and
      (panel.state == "normal" or
       panel.state == "landing" or
       panel.state == "swapping") then
