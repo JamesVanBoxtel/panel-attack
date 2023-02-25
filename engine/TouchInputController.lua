@@ -154,9 +154,13 @@ function TouchInputController:handleTouch()
           and math.abs(self.touchedCell.col - self.lingeringTouchCursor.col) == 1 then
           -- the touched panel is on the same row and adjacent to the selected panel
           -- thus fulfilling the minimum condition to be swapped
-          -- whether the swap succeeds or fails, the lingering touch has to be cleared
-          self:clearLingeringTouch()
-          return self:tryPerformTouchSwap(self.touchedCell.col)
+          local cursorRow, cursorColumn = self:tryPerformTouchSwap(self.touchedCell.col)
+          if cursorColumn ~= self.stack.cur_col then
+          -- if the swap succeeded, the lingering touch has to be cleared
+            self:clearLingeringTouch()
+          end
+
+          return cursorRow, cursorColumn
         else
           -- We touched somewhere else on the stack
           -- clear cursor, lingering and touched panel so we can do another initial touch next frame
