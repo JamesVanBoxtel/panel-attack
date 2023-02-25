@@ -176,11 +176,12 @@ function TouchInputController:handleTouch()
     elseif self:touchOngoing() then
       if self:lingeringTouchIsSet() then
         -- buffered swaps are currently not enabled due to balancing concerns
-        -- meaning that lingeringTouch should also never be set while a touch is on-going
-        self:clearLingeringTouch()
+        -- always keep the current cursor location and don't try to process a swap under this condition
+        -- the lingering cursor should not be cleared so the code keeps running into this branch until the player releases the touch
+        return self.stack.cur_row, self.stack.cur_col
+      else
+        return self:tryPerformTouchSwap(self.touchedCell.col)
       end
-
-      return self:tryPerformTouchSwap(self.touchedCell.col)
     elseif self:touchReleased() then
       -- remove the cursor from display if it has reached self.touchTargetColumn
       if self.touchTargetColumn ~= 0 then
