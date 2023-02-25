@@ -187,11 +187,13 @@ function TouchInputController:handleTouch()
         return self:tryPerformTouchSwap(self.touchedCell.col)
       end
     elseif self:touchReleased() then
-      -- remove the cursor from display if it has reached self.touchTargetColumn
-      if self.touchTargetColumn ~= 0 then
+      if self:lingeringTouchIsSet() then
+        -- once a lingering touch cursor is active, the player has to release and tap again to move the panel
+        self.touchTargetColumn = 0
+      elseif self.touchTargetColumn ~= 0 then
+        -- remove the cursor from display if it has reached self.touchTargetColumn
         return self:tryPerformTouchSwap(self.touchTargetColumn)
       end
-
       return self.lingeringTouchCursor.row, self.lingeringTouchCursor.col
     else
       -- there is no on-going touch but there may still be a target to swap to from the last release
