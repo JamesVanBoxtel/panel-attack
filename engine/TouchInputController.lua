@@ -274,6 +274,8 @@ function TouchInputController:tryPerformTouchSwap(targetColumn)
         logger.trace("lingeringTouchCursor was set because destination panel was not swappable")
         self.lingeringTouchCursor.row = self.stack.cur_row
         self.lingeringTouchCursor.col = self.stack.cur_col
+        -- and cancel the swap for consecutive frames
+        self.touchTargetColumn = 0
       end
     end
   end
