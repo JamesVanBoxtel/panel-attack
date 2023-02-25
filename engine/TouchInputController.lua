@@ -11,11 +11,10 @@ TouchInputController =
     self.stack = stack
     --if any is {row = 0, col = 0}, this is the equivalent if the variable being nil.  They do not describe any panel in the stack at the moment.
     self.touchedCell = {row = 0, col = 0}  -- cell that is currently touched
-    self.cellFirstTouched = {row = 0, col = 0}  --cell that was first touched, since touchedCell was 0,0.
     self.previousTouchedCell = {row = 0, col = 0}  --cell that was touched last frame
     self.touchTargetColumn = 0 -- this is the destination column we will always be trying to swap toward. Set to self.touchedCell.col or if that's 0, use self.previousTouchedCell.col, or if that's 0, use existing self.touchTargetColumn.  if target is reached by self.cur_col, set self.touchTargetColumn to 0.
     self.lingeringTouchCursor = {row = 0, col = 0} --origin of a failed swap, leave the cursor here even if the touch is released.  Also, leave the cursor here if a panel was touched, and then released without the touch moving.  This will allow us to tap an adjacent panel to try to swap with it.
-    self.swapsThisTouch = 0  -- number of swaps that have been initiated since the last time self.cellFirstTouched was 0,0
+    self.swapsThisTouch = 0  -- number of swaps that have been initiated since the last touch
     self.touchSwapCooldownTimer = 0 -- if this is zero, a swap can happen.  set to TOUCH_SWAP_COOLDOWN on each swap after the first. decrement by 1 each frame.
   end
 )
@@ -146,8 +145,6 @@ function TouchInputController:handleTouch()
     self:updateTouchTargetColumn()
 
     if self:touchInitiated() then
-      self.cellFirstTouched.row = self.touchedCell.row
-      self.cellFirstTouched.col = self.touchedCell.col
       self.swapsThisTouch = 0
       self.touchSwapCooldownTimer = 0
 
@@ -177,11 +174,14 @@ function TouchInputController:handleTouch()
         end
       end
     elseif self:touchOngoing() then
-      assert(not self:lingeringTouchIsSet(), "buffered swaps are currently not enabled due to balancing concerns\nmeaning that lingeringTouch should also never be set while a touch is on-going")
+      if self:lingeringTouchIsSet() then
+        -- buffered swaps are currently not enabled due to balancing concerns
+        -- meaning that lingeringTouch should also never be set while a touch is on-going
+        self:clearLingeringTouch()
+      end
+
       return self:tryPerformTouchSwap(self.touchedCell.col)
     elseif self:touchReleased() then
-      self.cellFirstTouched.row = 0
-      self.cellFirstTouched.col = 0
       -- remove the cursor from display if it has reached self.touchTargetColumn
       if self.touchTargetColumn ~= 0 then
         return self:tryPerformTouchSwap(self.touchTargetColumn)
@@ -293,9 +293,6 @@ function TouchInputController:touchReleased()
 end
 
 function TouchInputController:stackIsCreatingNewRow()
-  if self.cellFirstTouched and self.cellFirstTouched.row and self.cellFirstTouched.row ~= 0 then
-    self.cellFirstTouched.row = bound(1,self.cellFirstTouched.row + 1, self.stack.top_cur_row)
-  end
   if self.lingeringTouchCursor and self.lingeringTouchCursor.row and self.lingeringTouchCursor.row ~= 0 then
     self.lingeringTouchCursor.row = bound(1,self.lingeringTouchCursor.row + 1, self.stack.top_cur_row)
   end
@@ -306,7 +303,6 @@ function TouchInputController:debugString()
   local inputs_to_print = ""
   inputs_to_print = inputs_to_print .. "\ncursor:".. self.stack.cur_col ..",".. self.stack.cur_row
   inputs_to_print = inputs_to_print .. "\ntouchedCell:"..self.touchedCell.col..","..self.touchedCell.row
-  inputs_to_print = inputs_to_print .. "\ncellFirstTouched:"..self.cellFirstTouched.col..","..self.cellFirstTouched.row
   inputs_to_print = inputs_to_print .. "\npreviousTouchedCell:"..self.previousTouchedCell.col..","..self.previousTouchedCell.row
   inputs_to_print = inputs_to_print .. "\ntouchTargetColumn:"..self.touchTargetColumn
   inputs_to_print = inputs_to_print .. "\nlingeringTouchCursor:"..self.lingeringTouchCursor.col..","..self.lingeringTouchCursor.row
