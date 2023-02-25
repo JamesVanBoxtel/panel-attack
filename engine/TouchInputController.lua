@@ -288,7 +288,7 @@ function TouchInputController:touchOngoing()
 end
 
 function TouchInputController:touchReleased()
-  return (self.previousTouchedCell and not (self.previousTouchedCell.row == 0 and self.previousTouchedCell.col == 0)) 
+  return (self.previousTouchedCell and not (self.previousTouchedCell.row == 0 and self.previousTouchedCell.col == 0))
   and (not self.touchedCell or (self.touchedCell.row == 0 and self.touchedCell.col == 0))
 end
 
