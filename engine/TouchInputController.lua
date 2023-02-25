@@ -192,14 +192,14 @@ function TouchInputController:handleTouch()
         return self:tryPerformTouchSwap(self.touchTargetColumn)
       end
 
-      return 0, 0
+      return self.lingeringTouchCursor.row, self.lingeringTouchCursor.col
     else
       -- there is no on-going touch but there may still be a target to swap to from the last release
       if self.touchTargetColumn ~= 0 then
         return self:tryPerformTouchSwap(self.touchTargetColumn)
       end
 
-      return 0, 0
+      return self.lingeringTouchCursor.row, self.lingeringTouchCursor.col
     end
   end
 end
