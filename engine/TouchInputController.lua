@@ -7,15 +7,25 @@ local TOUCH_SWAP_COOLDOWN = 5  -- default number of cooldown frames between touc
 TouchInputController =
   class(
   function(self, stack)
-    self.touchingStack = false -- whether the stack (panels) are touched.  Still true if touch is dragged off the stack, but not released yet.
     self.stack = stack
-    --if any is {row = 0, col = 0}, this is the equivalent if the variable being nil.  They do not describe any panel in the stack at the moment.
-    self.touchedCell = {row = 0, col = 0}  -- cell that is currently touched
-    self.previousTouchedCell = {row = 0, col = 0}  --cell that was touched last frame
-    self.touchTargetColumn = 0 -- this is the destination column we will always be trying to swap toward. Set to self.touchedCell.col or if that's 0, use self.previousTouchedCell.col, or if that's 0, use existing self.touchTargetColumn.  if target is reached by self.cur_col, set self.touchTargetColumn to 0.
-    self.lingeringTouchCursor = {row = 0, col = 0} --origin of a failed swap, leave the cursor here even if the touch is released.  Also, leave the cursor here if a panel was touched, and then released without the touch moving.  This will allow us to tap an adjacent panel to try to swap with it.
-    self.swapsThisTouch = 0  -- number of swaps that have been initiated since the last touch
-    self.touchSwapCooldownTimer = 0 -- if this is zero, a swap can happen.  set to TOUCH_SWAP_COOLDOWN on each swap after the first. decrement by 1 each frame.
+    -- whether the stack (panels) are touched.  Still true if touch is dragged off the stack, but not released yet.
+    self.touchingStack = false
+    --if any is {row = 0, col = 0}, this is the equivalent if the variable being nil and not refering to any panel on the stack
+    -- cell that is currently touched, used to determine touch events (initiate, hold/drag, release) and as input for the current frame
+    self.touchedCell = {row = 0, col = 0}
+    -- cell that was touched last frame, used to determine touch events (initiate, hold/drag, release)
+    self.previousTouchedCell = {row = 0, col = 0}
+    -- this is the destination column we will always be trying to swap toward. 
+    -- Set to self.touchedCell.col or if that's 0, use self.previousTouchedCell.col, or if that's 0, use existing self.touchTargetColumn. 
+    -- if target is reached by self.cur_col, set self.touchTargetColumn to 0.
+    self.touchTargetColumn = 0
+    -- origin of a failed swap due to the target panel being unswappable, leave the cursor here even if the touch is released.
+    self.lingeringTouchCursor = {row = 0, col = 0}
+    -- number of swaps that have been initiated since the last touch
+    self.swapsThisTouch = 0
+    -- if this is zero, a swap can happen.
+    -- set to TOUCH_SWAP_COOLDOWN on each swap after the first. decrement by 1 each frame.
+    self.touchSwapCooldownTimer = 0
   end
 )
 
