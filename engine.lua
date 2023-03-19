@@ -152,7 +152,7 @@ Stack =
     for i = 0, s.height do
       s.panels[i] = {}
       for j = 1, s.width do
-        s.panels[i][j] = s:createPanel(i, j)
+        s:createPanel(i, j)
       end
     end
     s:moveForPlayerNumber(which)
@@ -724,7 +724,6 @@ function Stack.puzzleStringToPanels(self, puzzleString)
           if not garbageStartRow and tonumber(color) then
             local panel = self:createPanel(row, column)
             panel.color = tonumber(color)
-            panels[row][column] = panel
           else
             -- start of a garbage block
             if color == "]" or color == "}" then
@@ -746,7 +745,6 @@ function Stack.puzzleStringToPanels(self, puzzleString)
             -- instead save the column index in that field to calculate it later
             panel.x_offset = column
             panel.metal = isMetal
-            panels[row][column] = panel
             table.insert(connectedGarbagePanels, panel)
             -- garbage ends here
             if color == "[" or color == "{" then
@@ -778,7 +776,6 @@ function Stack.puzzleStringToPanels(self, puzzleString)
     local panel = self:createPanel(0, column)
     panel.color = 9
     panel.state = "dimmed"
-    panels[0][column] = panel
   end
 
   return panels
@@ -2142,10 +2139,9 @@ function Stack.dropGarbage(self, width, height, isMetal)
       -- every row that will receive garbage needs to be fully filled up
       -- so iterate from 1 to stack width instead of column to column + width - 1
       for col = 1, self.width do
-        self.panels[row][col] = self:createPanel(row, col)
+        local panel = self:createPanel(row, col)
 
         if isPartOfGarbage(col) then
-          local panel = self.panels[row][col]
           panel.garbageId = self.garbageCreatedCount
           panel.isGarbage = true
           panel.color = 9
@@ -2512,7 +2508,7 @@ function Stack.new_row(self)
   panels[stackHeight] = {}
 
   for col = 1, self.width do
-    panels[stackHeight][col] = self:createPanel(stackHeight, col)
+    self:createPanel(stackHeight, col)
   end
 
   -- move panels up
@@ -2617,6 +2613,7 @@ function Stack:getAttackPatternData()
   return data
 end
 
+-- creates a new panel at the specified row+column and adds it to the Stack's panels table
 function Stack.createPanel(self, row, column)
   self.panelsCreatedCount = self.panelsCreatedCount + 1
   local panel = Panel(self.panelsCreatedCount, row, column, self.FRAMECOUNTS)
@@ -2632,6 +2629,7 @@ function Stack.createPanel(self, row, column)
   panel.onGarbageLand = function(panel)
     self:onGarbageLand(panel)
   end
+  self.panels[row][column] = panel
   return panel
 end
 
