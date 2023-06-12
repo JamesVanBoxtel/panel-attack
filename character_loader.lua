@@ -14,8 +14,10 @@ characters_ids_by_display_names = {} -- holds keys to array of character ids hol
 
 -- queues a character to be loaded
 function character_loader_load(character_id)
-  if characters[character_id] and not characters[character_id].fully_loaded then
-    loading_queue:push(character_id)
+  if not table.contains(loading_queue, character_id) then
+    if characters[character_id] and not characters[character_id].fully_loaded then
+      loading_queue:push(character_id)
+    end
   end
 end
 

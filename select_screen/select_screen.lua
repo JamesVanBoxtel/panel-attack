@@ -586,7 +586,18 @@ function select_screen.sendMenuState(self)
     end
   end
 
-  json_send({menu_state = menuState})
+  local status, error = pcall(
+    function()
+      json_send({menu_state = menuState})
+    end
+  )
+  if status == false then
+    if error and type(error) == "string" then
+      logger.error("pcall error results: " .. tostring(error))
+    end
+    error("pcall: Trying to send an illegal object to the server\n" .. table_to_string(menuState))
+  end
+
 end
 
 function select_screen.handleInput(self)

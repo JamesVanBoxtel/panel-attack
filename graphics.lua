@@ -83,11 +83,13 @@ function Stack.draw_cards(self)
       if cardImage == nil then
        cardImage = themes[config.theme].images.IMG_cards[card.chain][0]
       end
-      local icon_width, icon_height = cardImage:getDimensions()
-      local fade = 1 - math.min(0.5 * ((card.frame-1) / 22), 0.5)
-      set_color(1, 1, 1, fade)
-      draw(cardImage, draw_x, draw_y, 0, iconSize / icon_width, iconSize / icon_height)
-      set_color(1, 1, 1, 1)
+      if cardImage then
+        local icon_width, icon_height = cardImage:getDimensions()
+        local fade = 1 - math.min(0.5 * ((card.frame-1) / 22), 0.5)
+        set_color(1, 1, 1, fade)
+        draw(cardImage, draw_x, draw_y, 0, iconSize / icon_width, iconSize / icon_height)
+        set_color(1, 1, 1, 1)
+      end
     end
   end
 end
