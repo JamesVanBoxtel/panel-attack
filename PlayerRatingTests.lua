@@ -6,21 +6,22 @@ local simpleCSV = require("simplecsv")
 local function testWeirdNumberStability() 
 
   local player1 = PlayerRating(1273, 20)
-  local player2 = PlayerRating(1500, 100)
+  local player2 = PlayerRating(1500, 20)
 
   local wins = 12
   local totalGames = 25
 
-  local updatedPlayer1 = player1:newRatingWithResults(player1:createSetResults(player2, wins, totalGames))
-  local updatedPlayer2 = player2:newRatingWithResults(player1:createSetResults(player1, totalGames-wins, totalGames))
+  local updatedPlayer1 = player1:newRatingForRatingPeriodWithResults(player1:createSetResults(player2, wins, totalGames))
+  local updatedPlayer2 = player2:newRatingForRatingPeriodWithResults(player1:createSetResults(player1, totalGames-wins, totalGames))
 
   assert(updatedPlayer1:getRating() > 1073)
   assert(updatedPlayer2:getRating() < 1500)
+  assert(updatedPlayer2:getRating() > 1338)
 end
 
 testWeirdNumberStability()
 
-local function testRatingPeriods() 
+local function testRatingPeriodsForOccasionalPlayers() 
   local players = {}
   for _ = 1, 3 do
     players[#players+1] = PlayerRating()
@@ -32,21 +33,30 @@ local function testRatingPeriods()
     for _ = 1, 3 do
       playerResults[#playerResults+1] = {}
     end
-    table.appendToList(playerResults[1], players[1]:createSetResults(players[2], 6, 10))
-    table.appendToList(playerResults[2], players[2]:createSetResults(players[1], 4, 10))
+    local gameCount = 10
+    local winPercentage = .6
+    local winCount = math.ceil(winPercentage*gameCount)
+    table.appendToList(playerResults[1], players[1]:createSetResults(players[2], winCount, gameCount))
+    table.appendToList(playerResults[2], players[2]:createSetResults(players[1], gameCount-winCount, gameCount))
     
-    table.appendToList(playerResults[1], players[1]:createSetResults(players[3], 4, 5))
-    table.appendToList(playerResults[3], players[3]:createSetResults(players[1], 1, 5))
+    gameCount = 5
+    winPercentage = .8
+    winCount = math.ceil(winPercentage*gameCount)
+    table.appendToList(playerResults[1], players[1]:createSetResults(players[3], winCount, gameCount))
+    table.appendToList(playerResults[3], players[3]:createSetResults(players[1], gameCount-winCount, gameCount))
 
-    table.appendToList(playerResults[2], players[2]:createSetResults(players[3], 3, 5))
-    table.appendToList(playerResults[3], players[3]:createSetResults(players[2], 2, 5))
+    gameCount = 5
+    winPercentage = .6
+    winCount = math.ceil(winPercentage*gameCount)
+    table.appendToList(playerResults[2], players[2]:createSetResults(players[3], winCount, gameCount))
+    table.appendToList(playerResults[3], players[3]:createSetResults(players[2], gameCount-winCount, gameCount))
 
     previousPlayers = {}
     for k = 1, 3 do
       previousPlayers[#previousPlayers+1] = players[k]:copy()
     end
     for k = 1, 3 do
-      players[k] = players[k]:newRatingWithResults(playerResults[k])
+      players[k] = players[k]:newRatingForRatingPeriodWithResults(playerResults[k])
     end
   end
 
@@ -57,6 +67,10 @@ local function testRatingPeriods()
   assert(players[1].glicko.RD < players[3].glicko.RD)
   assert(players[2].glicko.RD < players[3].glicko.RD)
 
+  assert(players[1].glicko.RD < 60)
+  assert(players[2].glicko.RD < 60)
+  assert(players[3].glicko.RD < 60)
+
   for k = 1, 3 do
     -- rating and deviation should stabilize over time if players perform the same
     assert(math.abs(previousPlayers[k]:getRating() - players[k]:getRating()) < 1)
@@ -65,18 +79,101 @@ local function testRatingPeriods()
   end
 end 
 
-testRatingPeriods()
+testRatingPeriodsForOccasionalPlayers()
+
+local function testRatingPeriodsForObsessivePlayers() 
+  local players = {}
+  for _ = 1, 3 do
+    players[#players+1] = PlayerRating()
+  end
+  
+  local previousPlayers = nil
+  for i = 1, 100, 1 do
+    local playerResults = {}
+    for _ = 1, 3 do
+      playerResults[#playerResults+1] = {}
+    end
+    local gameCount = 100
+    local winPercentage = .6
+    local winCount = math.ceil(winPercentage*gameCount)
+    table.appendToList(playerResults[1], players[1]:createSetResults(players[2], winCount, gameCount))
+    table.appendToList(playerResults[2], players[2]:createSetResults(players[1], gameCount-winCount, gameCount))
+    
+    gameCount = 80
+    winPercentage = .8
+    winCount = math.ceil(winPercentage*gameCount)
+    table.appendToList(playerResults[1], players[1]:createSetResults(players[3], winCount, gameCount))
+    table.appendToList(playerResults[3], players[3]:createSetResults(players[1], gameCount-winCount, gameCount))
+
+    gameCount = 60
+    winPercentage = .6
+    winCount = math.ceil(winPercentage*gameCount)
+    table.appendToList(playerResults[2], players[2]:createSetResults(players[3], winCount, gameCount))
+    table.appendToList(playerResults[3], players[3]:createSetResults(players[2], gameCount-winCount, gameCount))
+
+    previousPlayers = {}
+    for k = 1, 3 do
+      previousPlayers[#previousPlayers+1] = players[k]:copy()
+    end
+    for k = 1, 3 do
+      players[k] = players[k]:newRatingForRatingPeriodWithResults(playerResults[k])
+    end
+  end
+
+  assert(players[1]:getRating() > players[2]:getRating())
+  assert(players[1]:getRating() > players[3]:getRating())
+  assert(players[2]:getRating() > players[3]:getRating())
+
+  assert(players[1].glicko.RD < players[3].glicko.RD)
+  assert(players[2].glicko.RD < players[3].glicko.RD)
+
+  assert(players[1].glicko.RD < 20)
+  assert(players[2].glicko.RD < 20)
+  assert(players[3].glicko.RD < 20)
+
+  for k = 1, 3 do
+    -- rating and deviation should stabilize over time if players perform the same
+    assert(math.abs(previousPlayers[k]:getRating() - players[k]:getRating()) < 1)
+    assert(math.abs(previousPlayers[k].glicko.RD - players[k].glicko.RD) < 1)
+    assert(previousPlayers[k]:isProvisional() == false)
+  end
+end 
+
+testRatingPeriodsForObsessivePlayers()
+
+-- When a stable player doesn't play for a long time, we should lose some confidence in their rating, but not all.
+local function testMaxRD() 
+  local playerRating = PlayerRating(2000, 30)
+  
+  local threeMonthsInSeconds = 60 * 60 * 24 * 31 * 3
+  local threeMonthsOfRatingPeriod = math.ceil(threeMonthsInSeconds / PlayerRating.RATING_PERIOD_IN_SECONDS)
+  for i = 1, threeMonthsOfRatingPeriod, 1 do
+    playerRating = playerRating:newRatingForRatingPeriodWithResults({})
+  end
+
+  assert(playerRating.glicko.RD >= 120)
+
+  local nineMoreMonths = 60 * 60 * 24 * 31 * 9
+  local oneYearOfRatingPeriod = math.ceil(nineMoreMonths / PlayerRating.RATING_PERIOD_IN_SECONDS)
+  for i = 1, oneYearOfRatingPeriod, 1 do
+    playerRating = playerRating:newRatingForRatingPeriodWithResults({})
+  end
+
+  assert(playerRating.glicko.RD >= 245)
+end 
+
+testMaxRD()
 
 local function testFarming() 
   local players = {}
-  for _ = 1, 3 do
+  for _ = 1, 2 do
     players[#players+1] = PlayerRating()
   end
   
   -- Player 1 and 2 play normal sets to get a standard
   for i = 1, 100, 1 do
     local playerResults = {}
-    for _ = 1, 3 do
+    for _ = 1, 2 do
       playerResults[#playerResults+1] = {}
     end
 
@@ -84,14 +181,14 @@ local function testFarming()
     table.appendToList(playerResults[2], players[2]:createSetResults(players[1], 9, 20))
 
     for k = 1, 2 do
-      players[k] = players[k]:newRatingWithResults(playerResults[k])
+      players[k] = players[k]:newRatingForRatingPeriodWithResults(playerResults[k])
     end
   end
 
   -- Farm newcomers to see how much rating you can gain
   for i = 1, 100, 1 do
     local playerResults = {}
-    for _ = 1, 3 do
+    for _ = 1, 1 do
       playerResults[#playerResults+1] = {}
     end
 
@@ -99,27 +196,16 @@ local function testFarming()
     table.appendToList(playerResults[1], players[1]:createSetResults(newbiePlayer, 10, 10))
 
     for k = 1, 1 do
-      players[k] = players[k]:newRatingWithResults(playerResults[k])
+      players[k] = players[k]:newRatingForRatingPeriodWithResults(playerResults[k])
     end
   end
 
-  assert(players[1]:getRating() > DEFAULT_RATING + ALLOWABLE_RATING_SPREAD) -- Ranked high enough we can't play default players anymore
-  assert(players[1]:getRating() < 2000) -- Thus we couldn't farm really high
+  assert(players[1]:getRating() > PlayerRating.STARTING_RATING + PlayerRating.ALLOWABLE_RATING_SPREAD) -- Ranked high enough we can't play default players anymore
+  assert(players[1]:getRating() < 3000) -- Thus we couldn't farm really high
 
 end 
 
 testFarming()
-
-local function invertedGameResult(gameResult)
-  if gameResult == 0 then
-    return 1
-  end
-  if gameResult == 1 then
-    return 0
-  end
-  -- Ties stay 0.5
-  return gameResult
-end
 
 local usedNames = {}
 local publicIDMap = {} -- mapping of privateID to publicID
@@ -145,7 +231,7 @@ local function runRatingPeriods(firstRatingPeriod, lastRatingPeriod, players, gl
 
       local playerRating = playerTable.playerRating
       local gameResults = playerTable.gameResults
-      local newPlayerRating = playerRating:newRatingWithResults(gameResults)
+      local newPlayerRating = playerRating:newRatingForRatingPeriodWithResults(gameResults)
 
       playerTable.playerRating = newPlayerRating
       playerTable.gameResults = {}
@@ -158,7 +244,9 @@ local function runRatingPeriods(firstRatingPeriod, lastRatingPeriod, players, gl
         row[#row+1] = playerID
         row[#row+1] = playerTable.playerRating:getRating()
         row[#row+1] = playerTable.playerRating.glicko.RD
-        glickoResultsTable[#glickoResultsTable+1] = row
+        if firstRatingPeriod % 20 == 1 then
+          glickoResultsTable[#glickoResultsTable+1] = row
+        end
       end
     end
   end
@@ -172,7 +260,6 @@ local function testRealWorldData()
   local latestRatingPeriodFound = nil
   local gameResults = simpleCSV.read("GameResults.csv")
   assert(gameResults)
-
 
   local playersFile, err = love.filesystem.newFile("players.txt", "r")
   if playersFile then
@@ -223,7 +310,7 @@ local function testRealWorldData()
       local playerID = currentPlayers[1]
       if not players[playerID] then
         players[playerID] = {}
-        players[playerID].playerRating = PlayerRating()
+        players[playerID].playerRating = PlayerRating(1500, 250)
         players[playerID].gameResults = {}
         players[playerID].error = 0
         players[playerID].totalGames = 0
@@ -235,16 +322,19 @@ local function testRealWorldData()
       local opponent = players[currentPlayers[2]].playerRating
       local gameResult = winResult
       if index == 2 then
-        gameResult = invertedGameResult(winResult)
+        gameResult = PlayerRating.invertedGameResult(winResult)
       end
-      local expected = player:expectedOutcome(opponent)
-      --if player:isProvisional() == false then
-        players[currentPlayers[1]].error = players[currentPlayers[1]].error + (gameResult - expected)
-        players[currentPlayers[1]].totalGames = players[currentPlayers[1]].totalGames + 1
-      --end
       local result = player:createGameResult(opponent, gameResult)
-      local gameResults = players[currentPlayers[1]].gameResults
-      gameResults[#gameResults+1] = result
+      if result then
+        local gameResults = players[currentPlayers[1]].gameResults
+        gameResults[#gameResults+1] = result
+
+        local expected = player:expectedOutcome(opponent)
+        if player:isProvisional() == false then
+          players[currentPlayers[1]].error = players[currentPlayers[1]].error + (gameResult - expected)
+          players[currentPlayers[1]].totalGames = players[currentPlayers[1]].totalGames + 1
+        end
+      end
     end
     
     ::continue::
@@ -272,8 +362,6 @@ local function testRealWorldData()
   local totalErrorPerGame = totalError / totalGames
 
   simpleCSV.write("Glicko.csv", glickoResultsTable)
-  -- 0.03724587514630  RATING PERIOD = 16hrs -- DEFAULT_RATING_DEVIATION = 250 = MAX_DEVIATION -- PROVISIONAL_DEVIATION = RD * 0.5 -- DEFAULT_VOLATILITY = 0.06 = MAX_VOLATILITY
-  -- 0.03792533617676  RATING PERIOD = 24hrs -- DEFAULT_RATING_DEVIATION = 250 = MAX_DEVIATION -- PROVISIONAL_DEVIATION = RD * 0.5 -- DEFAULT_VOLATILITY = 0.06 = MAX_VOLATILITY
 end 
 
 testRealWorldData()

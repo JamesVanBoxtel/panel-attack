@@ -1,31 +1,34 @@
 local logger = require("logger")
 local Glicko2 = require("Glicko")
 
-ALLOWABLE_RATING_SPREAD = 400
-DEFAULT_RATING = 1500
-
-local DEFAULT_RATING_DEVIATION = 250
-local MAX_DEVIATION = DEFAULT_RATING_DEVIATION
-local PROVISIONAL_DEVIATION = DEFAULT_RATING_DEVIATION * 0.5
-
-local DEFAULT_VOLATILITY = 0.06
-local MAX_VOLATILITY = DEFAULT_VOLATILITY
-
-local RATING_PERIOD_IN_SECONDS = 60 * 60 * 16
 
 -- Represents the rating for a player
 PlayerRating =
   class(
-  function(self, rating, ratingDeviation, volatility)
-    rating = rating or DEFAULT_RATING
-    ratingDeviation = ratingDeviation or DEFAULT_RATING_DEVIATION
-    volatility = volatility or DEFAULT_VOLATILITY
+  function(self, rating, ratingDeviation, maxRatingDeviation, volatility, maxVolatility)
+    rating = rating or self.STARTING_RATING
+    ratingDeviation = ratingDeviation or self.STARTING_RATING_DEVIATION
+    self.maxRatingDeviation = maxRatingDeviation or PlayerRating.MAX_RATING_DEVIATION
+    volatility = volatility or self.STARTING_VOLATILITY
+    self.maxVolatility = maxVolatility or PlayerRating.MAX_VOLATILITY
     self.glicko = Glicko2.g1(rating, ratingDeviation, volatility)
   end
 )
 
+PlayerRating.RATING_PERIOD_IN_SECONDS = 60 * 60 * 16
+PlayerRating.ALLOWABLE_RATING_SPREAD = 400
+
+PlayerRating.STARTING_RATING = 1500
+
+PlayerRating.STARTING_RATING_DEVIATION = 250
+PlayerRating.MAX_RATING_DEVIATION = 250
+
+PlayerRating.STARTING_VOLATILITY = 0.06
+PlayerRating.MAX_VOLATILITY = PlayerRating.STARTING_VOLATILITY
+
+-- Returns the rating period number for the given timestamp
 function PlayerRating.ratingPeriodForTimeStamp(timestamp)
-  local ratingPeriod = math.floor(timestamp / (RATING_PERIOD_IN_SECONDS))
+  local ratingPeriod = math.floor(timestamp / (PlayerRating.RATING_PERIOD_IN_SECONDS))
   return ratingPeriod
 end
 
@@ -38,15 +41,19 @@ function PlayerRating:getRating()
   return self.glicko.Rating
 end
 
+-- Returns a percentage value (0-1) of how likely the rating thinks the player is to win
 function PlayerRating:expectedOutcome(opponent)
   return self.glicko:expectedOutcome(opponent.glicko)
 end
 
+-- Returns if the player is still "provisional"
+-- Provisional is only used to change how the UI looks to help the player know this rating is not accurate yet.
 function PlayerRating:isProvisional()
-  return self.glicko.RD >= PROVISIONAL_DEVIATION
+  return self.glicko.RD >= self.maxRatingDeviation / 2
 end
 
 -- Returns an array of result objects representing the players wins against the given player
+-- Really only meant for testing.
 function PlayerRating:createSetResults(opponent, player1WinCount, gameCount)
   
   assert(gameCount >= player1WinCount)
@@ -71,23 +78,37 @@ function PlayerRating:createSetResults(opponent, player1WinCount, gameCount)
   return player1Results
 end
 
+-- Helper function to create one game result with the given outcome if the players are allowed to rank.
 function PlayerRating:createGameResult(opponent, matchOutcome)
   local result = nil
 
-  if math.abs(self:getRating() - opponent:getRating()) <= ALLOWABLE_RATING_SPREAD then
+  if math.abs(self:getRating() - opponent:getRating()) <= PlayerRating.ALLOWABLE_RATING_SPREAD then
     result = opponent.glicko:score(matchOutcome)
   end
 
   return result
 end
 
-function PlayerRating:newRatingWithResults(gameResults)
-  local updatedGlicko = self.glicko:update(gameResults)
-  if updatedGlicko.RD > MAX_DEVIATION then
-    updatedGlicko.RD = MAX_DEVIATION
+function PlayerRating.invertedGameResult(gameResult)
+  if gameResult == 0 then
+    return 1
   end
-  if updatedGlicko.Vol > MAX_VOLATILITY then
-    updatedGlicko.Vol = MAX_VOLATILITY
+  if gameResult == 1 then
+    return 0
+  end
+  -- Ties stay 0.5
+  return gameResult
+end
+
+-- Runs one "rating period" with the given results for the player.
+-- To get the accurate rating of a player, this must be run on every rating period since the last time they were updated.
+function PlayerRating:newRatingForRatingPeriodWithResults(gameResults)
+  local updatedGlicko = self.glicko:update(gameResults)
+  if updatedGlicko.RD > self.maxRatingDeviation then
+    updatedGlicko.RD = self.maxRatingDeviation
+  end
+  if updatedGlicko.Vol > self.maxVolatility then
+    updatedGlicko.Vol = self.maxVolatility
   end
   local updatedPlayer = self:copy()
   updatedPlayer.glicko = updatedGlicko
