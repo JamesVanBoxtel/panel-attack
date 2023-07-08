@@ -1,6 +1,7 @@
 require("input")
 require("util")
 local graphicsUtil = require("graphics_util")
+local TouchDataEncoding = require("engine.TouchDataEncoding")
 
 local floor = math.floor
 local ceil = math.ceil
@@ -266,41 +267,33 @@ function Stack.render(self)
     love.graphics.setShader()
   end
 
-  gfx_q:push({love.graphics.setCanvas, {{self.canvas, stencil = true}}})
-  gfx_q:push({love.graphics.clear, {}})
-  gfx_q:push({love.graphics.stencil, {frame_mask, "replace", 1}})
-  gfx_q:push({love.graphics.setStencilTest, {"greater", 0}})
+  love.graphics.setCanvas({self.canvas, stencil = true})
+  love.graphics.clear()
+  love.graphics.stencil(frame_mask, "replace", 1)
+  love.graphics.setStencilTest("greater", 0)
+  local characterObject = characters[self.character]
 
-  -- draw inside stack's frame canvas
-  local portrait_image = "portrait"
-  if not (self.which == 1) and characters[self.character].images["portrait2"] then
-    portrait_image = "portrait2"
-  end
-
-  local portrait_w, portrait_h = characters[self.character].images[portrait_image]:getDimensions()
-
-  -- Draw the portrait (with fade and inversion if needed)
-  if self.do_countdown == false then
-    self.portraitFade = 0.3
-  else
-    if self.countdown_CLOCK then
-      if self.countdown_CLOCK > 50 and self.countdown_CLOCK < 80 then
-        self.portraitFade = ((config.portrait_darkness / 100) / 79) * self.countdown_CLOCK
+  -- Update portrait fade if needed
+  if self.do_countdown then
+    -- self.portraitFade starts at 0 (no fade)
+    if self.countdown_clock then
+      local desiredFade = config.portrait_darkness / 100
+      local startFrame = 50
+      local fadeDuration = 30
+      if self.countdown_clock <= 50 then
+        self.portraitFade = 0
+      elseif self.countdown_clock > 50 and self.countdown_clock <= startFrame + fadeDuration then
+        local percent = (self.countdown_clock - startFrame) / fadeDuration
+        self.portraitFade = desiredFade * percent
       end
-    elseif self.CLOCK > 200 then
-      self.portraitFade = config.portrait_darkness / 100
     end
   end
-  if self.which == 1 or portrait_image == "portrait2" then
-    draw(characters[self.character].images[portrait_image], 4, 4, 0, 96 / portrait_w, 192 / portrait_h)
-  else
-    draw(characters[self.character].images[portrait_image], 100, 4, 0, (96/portrait_w)*-1, 192/portrait_h)
-  end
-  grectangle_color("fill", 4, 4, 96, 192, 0, 0, 0, self.portraitFade)
+
+  characterObject:drawPortrait(self.which, 4, 4, self.portraitFade)
 
   local metals
-  if self.garbage_target then
-    metals = panels[self.garbage_target.panels_dir].images.metals
+  if self.opponentStack then
+    metals = panels[self.opponentStack.panels_dir].images.metals
   else
     metals = panels[self.panels_dir].images.metals
   end
@@ -319,13 +312,13 @@ function Stack.render(self)
       local draw_y = 4 + (11 - (row)) * 16 + self.displacement - shake
       if panel.color ~= 0 and panel.state ~= "popped" then
         local draw_frame = 1
-        if panel.garbage then
+        if panel.isGarbage then
           local imgs = {flash = metals.flash}
           if not panel.metal then
-            if not self.garbage_target then 
-              imgs = characters[self.character].images
+            if not self.garbageTarget then 
+              imgs = characterObject.images
             else
-              imgs = characters[self.garbage_target.character].images
+              imgs = characters[self.garbageTarget.character].images
             end
           end
           if panel.x_offset == 0 and panel.y_offset == 0 then
@@ -375,7 +368,7 @@ function Stack.render(self)
           end
           if panel.state == "matched" then
             local flash_time = panel.initial_time - panel.timer
-            if flash_time >= self.FRAMECOUNT_FLASH then
+            if flash_time >= self.FRAMECOUNTS.FLASH then
               if panel.timer > panel.pop_time then
                 if panel.metal then
                   draw(metals.left, draw_x, draw_y, 0, 8 / metall_w, 16 / metall_h)
@@ -403,8 +396,8 @@ function Stack.render(self)
           end
         else
           if panel.state == "matched" then
-            local flash_time = self.FRAMECOUNT_MATCH - panel.timer
-            if flash_time >= self.FRAMECOUNT_FLASH then
+            local flash_time = self.FRAMECOUNTS.MATCH - panel.timer
+            if flash_time >= self.FRAMECOUNTS.FLASH then
               draw_frame = 6
             elseif flash_time % 2 == 1 then
               draw_frame = 1
@@ -416,7 +409,7 @@ function Stack.render(self)
           elseif panel.state == "landing" then
             draw_frame = bounce_table[panel.timer + 1]
           elseif panel.state == "swapping" then
-            if panel.is_swapping_from_left then
+            if panel.isSwappingFromLeft then
               draw_x = draw_x - panel.timer * 4
             else
               draw_x = draw_x + panel.timer * 4
@@ -467,31 +460,31 @@ function Stack.render(self)
   end
   -- ends here
 
-  gfx_q:push({love.graphics.setStencilTest, {}})
-  gfx_q:push({love.graphics.setCanvas, {GAME.globalCanvas}})
-  gfx_q:push({love.graphics.setBlendMode, {"alpha", "premultiplied"}})
-  gfx_q:push({love.graphics.draw, {self.canvas, (self.pos_x - 4) * GFX_SCALE, (self.pos_y - 4) * GFX_SCALE}})
-  gfx_q:push({love.graphics.setBlendMode, {"alpha", "alphamultiply"}})
+  love.graphics.setStencilTest()
+  love.graphics.setCanvas(GAME.globalCanvas)
+  love.graphics.setBlendMode("alpha", "premultiplied")
+  love.graphics.draw(self.canvas, (self.pos_x - 4) * GFX_SCALE, (self.pos_y - 4) * GFX_SCALE)
+  love.graphics.setBlendMode("alpha", "alphamultiply")
 
   self:draw_popfxs()
   self:draw_cards()
 
   -- Draw debug graphics if set
   if config.debug_mode then
-    local mx, my = GAME:transform_coordinates(love.mouse.getPosition())
+    local mouseX, mouseY = GAME:transform_coordinates(love.mouse.getPosition())
 
-    for row = 0, self.height do
+    for row = 0, math.min(self.height + 1, #self.panels) do
       for col = 1, self.width do
         local panel = self.panels[row][col]
         local draw_x = (self.pos_x + (col - 1) * 16) * GFX_SCALE
         local draw_y = (self.pos_y + (11 - (row)) * 16 + self.displacement - shake) * GFX_SCALE
 
         -- Require hovering over a stack to show details
-        if mx >= self.pos_x * GFX_SCALE and mx <= (self.pos_x + self.width * 16) * GFX_SCALE then
-          if panel.color ~= 0 and panel.state ~= "popped" then
+        if mouseX >= self.pos_x * GFX_SCALE and mouseX <= (self.pos_x + self.width * 16) * GFX_SCALE then
+          if not (panel.color == 0 and panel.state == "normal") then
             gprint(panel.state, draw_x, draw_y)
-            if panel.match_anyway ~= nil then
-              gprint(tostring(panel.match_anyway), draw_x, draw_y + 10)
+            if panel.matchAnyway then
+              gprint(tostring(panel.matchAnyway), draw_x, draw_y + 10)
               if panel.debug_tag then
                 gprint(tostring(panel.debug_tag), draw_x, draw_y + 20)
               end
@@ -502,7 +495,7 @@ function Stack.render(self)
           end
         end
 
-        if mx >= draw_x and mx < draw_x + 16 * GFX_SCALE and my >= draw_y and my < draw_y + 16 * GFX_SCALE then
+        if mouseX >= draw_x and mouseX < draw_x + 16 * GFX_SCALE and mouseY >= draw_y and mouseY < draw_y + 16 * GFX_SCALE then
           local str = loc("pl_panel_info", row, col)
           for k, v in pairsSortedByKeys(panel) do
             str = str .. "\n" .. k .. ": " .. tostring(v)
@@ -548,30 +541,26 @@ function Stack.render(self)
   end
 
   local function drawTimer()
+    if self == nil or self.which ~= 1 or self.game_stopwatch == nil or tonumber(self.game_stopwatch) == nil then
+      -- Only draw for one of the players, we will base our time on player 1
+      -- Also make sure we have a valid time to base off of
+      return
+    end
+
     -- Draw the timer for time attack
-    if self.match.mode == "time" then
-      local time_left = time_attack_time - ((self.game_stopwatch or (time_attack_time * 60)) / 60) -- time left in seconds
-      if time_left < 0 then
-        time_left = 0
-      end
-      local mins = math.floor(time_left / 60)
-      local secs = math.ceil(time_left % 60)
-      if secs == 60 then
-        secs = 0
-        mins = mins + 1
-      end
-      --gprint(loc("pl_time", string.format("%01d:%02d",mins,secs)), self.score_x, self.score_y+60)
-      draw_label(themes[config.theme].images.IMG_time, (main_infos_screen_pos.x + themes[config.theme].timeLabel_Pos[1]) / GFX_SCALE, (main_infos_screen_pos.y + themes[config.theme].timeLabel_Pos[2]) / GFX_SCALE, 0, themes[config.theme].timeLabel_Scale)
-      GraphicsUtil.draw_time(string.format("%01d:%02d", mins, secs), self.time_quads, main_infos_screen_pos.x + themes[config.theme].time_Pos[1], main_infos_screen_pos.y + themes[config.theme].time_Pos[2], themes[config.theme].time_Scale)
-    elseif self.match.mode == "puzzle" then
+    if self.match.mode == "puzzle" then
       -- puzzles don't have a timer...yet?
     else
-      -- Draw the time for non time attack modes
-      if self and self.which == 1 and self.game_stopwatch and tonumber(self.game_stopwatch) then
-        --gprint(frames_to_time_string(self.game_stopwatch, self.match.mode == "endless"), main_infos_screen_pos.x+10, main_infos_screen_pos.y+6)
-        draw_label(themes[config.theme].images.IMG_time, (main_infos_screen_pos.x + themes[config.theme].timeLabel_Pos[1]) / GFX_SCALE, (main_infos_screen_pos.y + themes[config.theme].timeLabel_Pos[2]) / GFX_SCALE, 0, themes[config.theme].timeLabel_Scale)
-        GraphicsUtil.draw_time(frames_to_time_string(self.game_stopwatch, self.match.mode == "endless"), self.time_quads, main_infos_screen_pos.x + themes[config.theme].time_Pos[1], main_infos_screen_pos.y + themes[config.theme].time_Pos[2], themes[config.theme].time_Scale)
+      local frames = self.game_stopwatch
+      if self.match.mode == "time" then
+        frames = (TIME_ATTACK_TIME * 60) - self.game_stopwatch
+        if frames < 0 then
+          frames = 0
+        end
       end
+      local timeString = frames_to_time_string(frames, self.match.mode == "endless")
+      draw_label(themes[config.theme].images.IMG_time, (main_infos_screen_pos.x + themes[config.theme].timeLabel_Pos[1]) / GFX_SCALE, (main_infos_screen_pos.y + themes[config.theme].timeLabel_Pos[2]) / GFX_SCALE, 0, themes[config.theme].timeLabel_Scale)
+      GraphicsUtil.draw_time(timeString, self.time_quads, main_infos_screen_pos.x + themes[config.theme].time_Pos[1], main_infos_screen_pos.y + themes[config.theme].time_Pos[2], themes[config.theme].time_Scale)
     end
   end
 
@@ -725,7 +714,12 @@ function Stack.render(self)
       gprint(loc("pl_metal", (self.metal_panels_queued or 0)), self.score_x, self.score_y + 180)
     end
     if config.debug_mode and (self.input_state or self.taunt_up or self.taunt_down) then
-      local iraise, iswap, iup, idown, ileft, iright = unpack(base64decode[self.input_state])
+      local iraise, iswap, iup, idown, ileft, iright
+      if self.inputMethod == "touch" then
+        iraise, _, _ = TouchDataEncoding.latinStringToTouchData(self.input_state, self.width)
+      else 
+        iraise, iswap, iup, idown, ileft, iright = unpack(base64decode[self.input_state])
+      end
       local inputs_to_print = "inputs:"
       if iraise then
         inputs_to_print = inputs_to_print .. "\nraise"
@@ -750,6 +744,9 @@ function Stack.render(self)
       end
       if self.taunt_up then
         inputs_to_print = inputs_to_print .. "\ntaunt_up"
+      end
+      if self.inputMethod == "touch" then
+        inputs_to_print = inputs_to_print .. self.touchInputController:debugString()
       end
       gprint(inputs_to_print, self.score_x, self.score_y + 195)
     end
@@ -818,10 +815,9 @@ function Stack.render(self)
     y = y + nextIconIncrement
   
     -- GPM
-    if analytic.lastGPM == 0 or math.fmod(self.CLOCK, 60) < self.max_runs_per_frame then
-      if self.CLOCK > 0 and (analytic.data.sent_garbage_lines > 0) then
-        local garbagePerMinute = analytic.data.sent_garbage_lines / (self.CLOCK / 60 / 60)
-        analytic.lastGPM = string.format("%0.1f", round(garbagePerMinute, 1))
+    if analytic.lastGPM == 0 or math.fmod(self.clock, 60) < self.max_runs_per_frame then
+      if self.clock > 0 and (analytic.data.sent_garbage_lines > 0) then
+        analytic.lastGPM = analytic:getRoundedGPM(self.clock)
       end
     end
     icon_width, icon_height = themes[config.theme].images.IMG_gpm:getDimensions()
@@ -847,9 +843,9 @@ function Stack.render(self)
     y = y + nextIconIncrement
   
     -- APM
-    if analytic.lastAPM == 0 or math.fmod(self.CLOCK, 60) < self.max_runs_per_frame then
-      if self.CLOCK > 0 and (analytic.data.swap_count + analytic.data.move_count > 0) then
-        local actionsPerMinute = (analytic.data.swap_count + analytic.data.move_count) / (self.CLOCK / 60 / 60)
+    if analytic.lastAPM == 0 or math.fmod(self.clock, 60) < self.max_runs_per_frame then
+      if self.clock > 0 and (analytic.data.swap_count + analytic.data.move_count > 0) then
+        local actionsPerMinute = (analytic.data.swap_count + analytic.data.move_count) / (self.clock / 60 / 60)
         analytic.lastAPM = string.format("%0.0f", round(actionsPerMinute, 0))
       end
     end
@@ -956,38 +952,50 @@ end
 
 -- Draw the stacks cursor
 function Stack.render_cursor(self)
-  local cursorImage = themes[config.theme].images.IMG_cursor[(floor(self.CLOCK / 16) % 2) + 1]
+  if self.inputMethod == "touch" then
+    if self.cur_row == 0 and self.cur_col == 0 then
+      --no panel is touched, let's not draw the cursor
+      return
+    end
+  end
+
+  local cursorImage = themes[config.theme].images.IMG_cursor[(floor(self.clock / 16) % 2) + 1]
   local shake_idx = #shake_arr - self.shake_time
   local shake = ceil((shake_arr[shake_idx] or 0) * 13)
-  local scale_x = 40 / cursorImage:getWidth()
+  local desiredCursorWidth = 40
+  local panelWidth = 16
+  local scale_x = desiredCursorWidth / cursorImage:getWidth()
   local scale_y = 24 / cursorImage:getHeight()
 
+  local renderCursor = true
   if self.countdown_timer then
-    if self.CLOCK % 2 == 0 then
-      draw(themes[config.theme].images.IMG_cursor[1], (self.cur_col - 1) * 16, (11 - (self.cur_row)) * 16 + self.displacement - shake, 0, scale_x, scale_y)
+    if self.clock % 2 ~= 0 then
+      renderCursor = false
     end
-  else
-    draw(cursorImage, (self.cur_col - 1) * 16, (11 - (self.cur_row)) * 16 + self.displacement - shake, 0, scale_x, scale_y)
+  end
+  if renderCursor then
+    local xPosition = (self.cur_col - 1) * panelWidth
+    qdraw(cursorImage, self.cursorQuads[1], xPosition, (11 - (self.cur_row)) * panelWidth + self.displacement - shake, 0, scale_x, scale_y)
+    if self.inputMethod == "touch" then
+      qdraw(cursorImage, self.cursorQuads[2], xPosition + 12, (11 - (self.cur_row)) * panelWidth + self.displacement - shake, 0, scale_x, scale_y)
+    end
   end
 end
 
 -- Draw the stacks countdown timer
 function Stack.render_countdown(self)
-  if self.do_countdown and self.countdown_CLOCK then
+  if self.do_countdown and self.countdown_clock then
     local ready_x = 16
     local initial_ready_y = 4
     local ready_y_drop_speed = 6
+    local ready_y = initial_ready_y + (math.min(8, self.countdown_clock) - 1) * ready_y_drop_speed
     local countdown_x = 44
     local countdown_y = 68
-    if self.countdown_CLOCK <= 8 then
-      local ready_y = initial_ready_y + (self.CLOCK - 1) * ready_y_drop_speed
+    if self.countdown_clock <= 8 then
       draw(themes[config.theme].images.IMG_ready, ready_x, ready_y)
-      if self.countdown_CLOCK == 8 then
-        self.ready_y = ready_y
-      end
-    elseif self.countdown_CLOCK >= 9 and self.countdown_timer and self.countdown_timer > 0 then
+    elseif self.countdown_clock >= 9 and self.countdown_timer and self.countdown_timer > 0 then
       if self.countdown_timer >= 100 then
-        draw(themes[config.theme].images.IMG_ready, ready_x, self.ready_y or initial_ready_y + 8 * 6)
+        draw(themes[config.theme].images.IMG_ready, ready_x, ready_y)
       end
       local IMG_number_to_draw = themes[config.theme].images.IMG_numbers[math.ceil(self.countdown_timer / 60)]
       if IMG_number_to_draw then

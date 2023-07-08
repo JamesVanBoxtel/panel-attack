@@ -70,6 +70,18 @@ function character_loader_clear()
   end
 end
 
+function wait_for_random_character(character)
+  local resolvedCharacter = character
+  if character == random_character_special_value then
+    resolvedCharacter = table.getRandomElement(characters_ids_for_current_theme)
+  elseif characters[character]:is_bundle() then -- may have picked a bundle
+    resolvedCharacter = table.getRandomElement(characters[character].sub_characters)
+  end
+  character_loader_load(resolvedCharacter)
+  character_loader_wait()
+  return resolvedCharacter
+end
+
 -- Adds all the characters recursively in a folder to the global characters variable
 local function add_characters_from_dir_rec(path)
   local lfs = love.filesystem
@@ -139,6 +151,10 @@ end
 
 -- Initializes the characters globals with data
 function characters_init()
+  characters = {} -- holds all characters, most of them will not be fully loaded
+  characters_ids = {} -- holds all characters ids
+  characters_ids_for_current_theme = {} -- holds characters ids for the current theme, those characters will appear in the lobby
+  characters_ids_by_display_names = {} -- holds keys to array of character ids holding that name
   add_characters_from_dir_rec("characters")
   fill_characters_ids()
 
@@ -148,8 +164,8 @@ function characters_init()
     fill_characters_ids()
   end
 
-  if love.filesystem.getInfo("themes/" .. config.theme .. "/characters.txt") then
-    for line in love.filesystem.lines("themes/" .. config.theme .. "/characters.txt") do
+  if love.filesystem.getInfo(Theme.themeDirectoryPath .. config.theme .. "/characters.txt") then
+    for line in love.filesystem.lines(Theme.themeDirectoryPath .. config.theme .. "/characters.txt") do
       line = trim(line) -- remove whitespace
       if characters[line] then
         -- found at least a valid character in a characters.txt file

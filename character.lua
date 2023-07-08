@@ -158,7 +158,8 @@ end
 -- GRAPHICS
 
 local basic_images = {"icon"}
-local other_images = {
+local all_images = {
+  "icon",
   "topleft",
   "botleft",
   "topright",
@@ -217,7 +218,7 @@ function characters_reload_graphics()
 end
 
 function Character.graphics_init(self, full, yields)
-  local character_images = full and other_images or basic_images
+  local character_images = full and all_images or basic_images
   for _, image_name in ipairs(character_images) do
     self.images[image_name] = GraphicsUtil.loadImageFromSupportedExtensions(self.path .. "/" .. image_name)
     if not self.images[image_name] and defaulted_images[image_name] and not self:is_bundle() then
@@ -277,8 +278,10 @@ function Character.graphics_init(self, full, yields)
 end
 
 function Character.graphics_uninit(self)
-  for _, image_name in ipairs(other_images) do
-    self.images[image_name] = nil
+  for imageName, _ in pairs(self.images) do
+    if not table.contains(basic_images, imageName) then
+      self.images[imageName] = nil
+    end
   end
   self.telegraph_garbage_images = {}
 end
@@ -331,7 +334,7 @@ function Character.sound_init(self, full, yields)
         self.musics[music]:setLooping(false)
       end
     elseif not self.musics[music] and defaulted_musics[music] and not self:is_bundle() then
-      self.musics[music] = default_character.musics[music] or zero_sound
+      self.musics[music] = default_character.musics[music] or themes[config.theme].zero_sound
     end
 
     if yields then
@@ -351,6 +354,45 @@ function Character.sound_uninit(self)
   -- music
   for _, music in ipairs(other_musics) do
     self.musics[music] = nil
+  end
+end
+
+--- Stack number 1 equals left side, 2 is right side
+function Character:portraitImage(stackNumber)
+  local portraitImageName = self:portraitName(stackNumber)
+  return self.images[portraitImageName]
+end
+
+function Character:portraitName(stackNumber)
+  local portrait_image = "portrait"
+  if stackNumber == 2 and self:portraitIsReversed(stackNumber) == false then
+    portrait_image = "portrait2"
+  end
+  return portrait_image
+end
+
+function Character:portraitIsReversed(stackNumber)
+  if stackNumber == 2 and self.images["portrait2"] == nil then
+    return true
+  end
+  return false
+end
+
+function Character:drawPortrait(stackNumber, x, y, fade)
+  local portraitImage = self:portraitImage(stackNumber)
+  local portraitImageWidth, portraitImageHeight = portraitImage:getDimensions()
+
+  local portraitImageX = x
+  local portraitMirror = 1
+  local portraitWidth = 96
+  local portraitHeight = 192
+  if self:portraitIsReversed(stackNumber) then
+    portraitImageX = portraitImageX + portraitWidth
+    portraitMirror = -1
+  end
+  draw(portraitImage, portraitImageX, y, 0, (portraitWidth / portraitImageWidth) * portraitMirror, portraitHeight / portraitImageHeight)
+  if fade > 0 then
+    grectangle_color("fill", x, y, portraitWidth, portraitHeight, 0, 0, 0, fade)
   end
 end
 
@@ -382,11 +424,11 @@ function Character.reassignLegacySfx(self)
     end
     
     self:fillInMissingSounds(self.sounds.chain, "chain", maxIndex)
+  end
 
-    if #self.sounds.shock > 0 then
-      -- combo_echo won't get used if shock is present, so it shouldn't show up in sound test any longer
-      self.sounds.combo_echo = nil
-    end
+  if #self.sounds.shock > 0 then
+    -- combo_echo won't get used if shock is present, so it shouldn't show up in sound test any longer
+    self.sounds.combo_echo = {}
   end
 end
 
@@ -419,19 +461,23 @@ function Character.loadSfx(self, name, yields)
   for i = 1, #files do
     stringLen = string.len(name)
     local index = tonumber(string.match(files[i], "%d+", stringLen + 1))
-    if index == nil then
-      -- indicates that there is no index, implicit 1
-      index = 1
+
+    -- for files with no suffix at all, index would be nil but they should go in sfx[1] instead
+    local targetIndex = 1
+    if index ~= nil then
+      -- otherwise use the index as normal
+      targetIndex = index
     end
 
+
     if perSizeSfxStart[name] then
-      if sfx[index] == nil then
-        sfx[index] = self:loadSubSfx(name, index)
+      if sfx[targetIndex] == nil then
+        sfx[targetIndex] = self:loadSubSfx(name, index)
       end
     else
       local sound = load_sound_from_supported_extensions(self.path .. "/" .. files[i], false)
       if sound ~= nil then
-        sfx[index] = sound
+        sfx[targetIndex] = sound
       end
 
       if yields then
@@ -439,13 +485,17 @@ function Character.loadSfx(self, name, yields)
       end
     end
 
-    if sfx[index] then
-      maxIndex = math.max(maxIndex, index)
+    if sfx[targetIndex] then
+      maxIndex = math.max(maxIndex, targetIndex)
     end
   end
 
   if perSizeSfxStart[name] then
     self:fillInMissingSounds(sfx, name, maxIndex)
+  else
+    -- #table may yield erroneous (too large) results for tables with gaps 
+    -- Character:playRandomSfx() relies on #table being accurate so we redo the table here if it has gaps
+    sfx = table.toContinuouslyIndexedTable(sfx)
   end
 
   return sfx
@@ -455,9 +505,9 @@ end
 function Character.loadSubSfx(self, name, index, yields)
   local sfxTable = {}
 
-  if index == 1 then
-    -- index 1 is implicit, e.g. chain, chain_2, chain2, chain2_2
-    -- so change it to an empty string so it isn't counted towards string length when searching variations
+  if index == nil then
+    -- index 1 can be implicit, e.g. chain, chain_2, chain2, chain2_2 (actually the official spec)
+    -- change it to an empty string so it doesn't crash on concat
     index = ""
   end
   local stringLen = string.len(name..index)
@@ -527,7 +577,8 @@ end
 local function playRandomSfx(sfxTable, fallback)
   if not GAME.muteSoundEffects then
     if sfxTable and #sfxTable > 0 then
-      sfxTable[math.random(#sfxTable)]:play()
+      local sfx = table.getRandomElement(sfxTable)
+      sfx:play()
     elseif fallback then
       playRandomSfx(fallback)
     end
@@ -590,14 +641,18 @@ function Character.playAttackSfx(self, attack)
         stopIfPlaying(v[i])
       end
     end
-    for i = 1, #self.sounds.combo_echo do
-      stopIfPlaying(self.sounds.combo_echo[i])
-    end
-    for _, v in pairs(self.sounds.shock) do
-      for i = 1, #v do
-        stopIfPlaying(v[i])
+    if table.length(self.sounds.shock) > 0 then
+      for _, v in pairs(self.sounds.shock) do
+        for i = 1, #v do
+          stopIfPlaying(v[i])
+        end
+      end
+    else
+      for i = 1, #self.sounds.combo_echo do
+        stopIfPlaying(self.sounds.combo_echo[i])
       end
     end
+
     for _, v in pairs(self.sounds.chain) do
       for i = 1, #v do
         stopIfPlaying(v[i])

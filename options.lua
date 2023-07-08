@@ -1,11 +1,13 @@
 local options = {}
 local analytics = require("analytics")
+local consts = require("consts")
 local wait = coroutine.yield
 local memory_before_options_menu = nil
 local theme_index
 local scaleTypeIndex
 local fixedScaleIndex
 local found_themes = {}
+local utf8 = require("utf8")
 
 local function general_menu()
   local ret = nil
@@ -19,7 +21,6 @@ local function general_menu()
     end
   end
   local generalMenu
-
 
   local function update_countdown(noToggle)
     if not noToggle then
@@ -391,7 +392,7 @@ local function audio_menu(button_idx)
 
         local ram_load = 0
         local max_ram_load = 20 --arbitrary number of characters/stages allowed to load before forcing a garbagecollection
-  
+
         local music_type = "normal_music"
         local musics_to_use = nil
 
@@ -400,7 +401,7 @@ local function audio_menu(button_idx)
 
         -- disable the menu_validate sound and keep a copy of it to restore later
         local menu_validate_sound = themes[config.theme].sounds.menu_validate
-        themes[config.theme].sounds.menu_validate = zero_sound
+        themes[config.theme].sounds.menu_validate = themes[config.theme].zero_sound
 
         gprint(loc("op_music_load"), unpack(themes[config.theme].main_menu_screen_pos))
         wait()
@@ -413,13 +414,13 @@ local function audio_menu(button_idx)
           local character = characters[character_id]
           if next(character.sub_characters) == nil then
             tracks[#tracks + 1] = {
-            is_character = true,
-            name = string.len(trim(character.display_name)) == 0 and character_id or character.display_name,
-            id = character_id,
-            parent_id = nil,
-            has_music = character.musics.normal_music and true,
-            has_danger = character.musics.danger_music and true,
-            style = character.music_style or "normal"
+              is_character = true,
+              name = string.len(trim(character.display_name)) == 0 and character_id or character.display_name,
+              id = character_id,
+              parent_id = nil,
+              has_music = character.musics.normal_music and true,
+              has_danger = character.musics.danger_music and true,
+              style = character.music_style or "normal"
             }
             ram_load = ram_load + 1
           else
@@ -429,13 +430,13 @@ local function audio_menu(button_idx)
               end
               local subcharacter = characters[sub_character_id]
               tracks[#tracks + 1] = {
-              is_character = true,
-              name = (string.len(trim(character.display_name)) == 0 and character_id or character.display_name) .. " " .. (string.len(trim(subcharacter.display_name)) == 0 and sub_character_id or subcharacter.display_name),
-              id = sub_character_id,
-              parent_id = character_id,
-              has_music = subcharacter.musics.normal_music and true,
-              has_danger = subcharacter.musics.danger_music and true,
-              style = subcharacter.music_style or "normal"
+                is_character = true,
+                name = (string.len(trim(character.display_name)) == 0 and character_id or character.display_name) .. " " .. (string.len(trim(subcharacter.display_name)) == 0 and sub_character_id or subcharacter.display_name),
+                id = sub_character_id,
+                parent_id = character_id,
+                has_music = subcharacter.musics.normal_music and true,
+                has_danger = subcharacter.musics.danger_music and true,
+                style = subcharacter.music_style or "normal"
               }
               ram_load = ram_load + 1
               if not characters[sub_character_id].fully_loaded then
@@ -454,7 +455,7 @@ local function audio_menu(button_idx)
 
         -- temporarily load music for stages that are not fully loaded to continue building tracklist, stages without music are skipped
         for _, stage_id in ipairs(stages_ids_for_current_theme) do
-          if not stages[stage_id].fully_loaded then 
+          if not stages[stage_id].fully_loaded then
             stages[stage_id]:sound_init(true, false)
           end
           local stage = stages[stage_id]
@@ -466,7 +467,7 @@ local function audio_menu(button_idx)
               parent_id = nil,
               has_music = true,
               has_danger = stage.musics.danger_music and true,
-              style = stage.music_style  or "normal"
+              style = stage.music_style or "normal"
             }
             ram_load = ram_load + 1
           end
@@ -512,13 +513,13 @@ local function audio_menu(button_idx)
 
         local function addSound(name, sound)
           if sound then
-            character_sounds[#character_sounds + 1] = { name = name, sound = sound}
+            character_sounds[#character_sounds + 1] = {name = name, sound = sound}
           end
         end
 
         local function addSounds(sound_name, sound_table, spacer)
           for i = 1, #sound_table do
-            addSound(sound_name .. ((i==1 and "") or (spacer .. i)), sound_table[i], i)
+            addSound(sound_name .. ((i == 1 and "") or (spacer .. i)), sound_table[i], i)
           end
         end
 
@@ -530,10 +531,11 @@ local function audio_menu(button_idx)
               addSounds(key .. i, character.sounds[key][i], " ")
             end
           end
-                                                    --per_chain
-          if (key == "chain" and character.chain_style == 1) or
-                                                    --per_combo
-             (key == "combo" and character.combo_style == 1) then
+          --per_chain
+          if
+            (key == "chain" and character.chain_style == 1) or --per_combo
+              (key == "combo" and character.combo_style == 1)
+           then
             addSounds(key .. " ?", character.sounds[key][0], " ")
           end
         end
@@ -556,7 +558,7 @@ local function audio_menu(button_idx)
               if tracks[index].parent_id then
                 parent = characters[tracks[index].parent_id]
               end
-              local attackSfx = { chain = true, combo = true, shock = true}
+              local attackSfx = {chain = true, combo = true, shock = true}
               for key, value in pairs(characters[tracks[index].id].sounds) do
                 if not attackSfx[key] then
                   if (value == nil or #value == 0) and parent then
@@ -575,11 +577,15 @@ local function audio_menu(button_idx)
                 end
               end
 
-              table.sort(character_sounds, function(a, b) return a.name < b.name end)
+              table.sort(
+                character_sounds,
+                function(a, b)
+                  return a.name < b.name
+                end
+              )
               soundTestMenu:set_button_setting(4, character_sounds[1].name)
 
               current_sound_index = 1
-
             else
               if not stages[tracks[index].id].fully_loaded then
                 stages[tracks[index].id]:sound_init(true, false)
@@ -607,7 +613,7 @@ local function audio_menu(button_idx)
           loaded = true
           loaded_track_index = index
         end
-  
+
         local function switchDanger()
           if not loaded then
             loadTrack()
@@ -636,7 +642,7 @@ local function audio_menu(button_idx)
             soundTestMenu:set_button_setting(2, music_type)
           end
         end
-  
+
         local function nextTrack()
           unloadTrack()
           if index == #tracks then
@@ -660,7 +666,7 @@ local function audio_menu(button_idx)
             soundTestMenu:set_button_setting(2, music_type)
           end
         end
-  
+
         local function previousTrack()
           unloadTrack()
           if index == 1 then
@@ -758,14 +764,14 @@ local function audio_menu(button_idx)
             play_optional_sfx(character_sounds[current_sound_index].sound)
           end
         end
-  
+
         local function goBack()
           soundTestMenu:set_active_idx(#soundTestMenu.buttons)
         end
 
         --fallback to main theme if nothing is playing or if dynamic music is playing, dynamic music cannot cleanly be "carried out" of the sound test due to the master volume reapplication in the audio options menu
         local function exitAudioTest()
-          if (not playing) or (tracks[index].style == "dynamic") then 
+          if (not playing) or (tracks[index].style == "dynamic") then
             if loaded then
               unloadTrack()
             end
@@ -774,7 +780,7 @@ local function audio_menu(button_idx)
           themes[config.theme].sounds.menu_validate = menu_validate_sound
           audio_test_ret = {audio_menu, {6}}
         end
-        
+
         soundTestMenu = Click_menu(menu_x, menu_y, nil, themes[config.theme].main_menu_max_height, 1)
         soundTestMenu:add_button(loc("character"), nextTrack, goBack, previousTrack, nextTrack)
         soundTestMenu:add_button(loc("op_music_type"), switchDanger, goBack, switchDanger, switchDanger)
@@ -799,7 +805,7 @@ local function audio_menu(button_idx)
               soundTestMenu:update()
             end
           )
-    
+
           if audio_test_ret then
             soundTestMenu:remove_self()
             return unpack(audio_test_ret)
@@ -885,6 +891,13 @@ local function debug_menu(button_idx)
     updateVsFramesBehind()
   end
 
+  local function update_debugServers(noToggle)
+    if not noToggle then
+      config.debugShowServers = not config.debugShowServers
+    end
+    debugMenu:set_button_setting(3, config.debugShowServers and loc("op_on") or loc("op_off"))
+  end
+
   local function nextMenu()
     debugMenu:selectNextIndex()
   end
@@ -900,9 +913,11 @@ local function debug_menu(button_idx)
   debugMenu = Click_menu(menu_x, menu_y, nil, themes[config.theme].main_menu_max_height, 1)
   debugMenu:add_button(loc("op_debug"), update_debug, goEscape, update_debug, update_debug)
   debugMenu:add_button("VS Frames Behind", nextMenu, goEscape, decreaseVsFramesBehind, increaseVsFramesBehind)
+  debugMenu:add_button("Show Debug Servers", update_debugServers, goEscape, update_debugServers, update_debugServers)
   debugMenu:add_button(loc("back"), exitSettings, exitSettings)
   update_debug(true)
   updateVsFramesBehind()
+  update_debugServers(true)
 
   if button_idx then
     debugMenu:set_active_idx(button_idx)
@@ -963,25 +978,25 @@ local function about_menu(button_idx)
   end
 
   local function show_themes_readme()
-    if not love.filesystem.getInfo("themes/" .. prefix_of_ignored_dirs .. default_theme_dir) then
+    if not love.filesystem.getInfo(Theme.themeDirectoryPath .. prefix_of_ignored_dirs .. consts.DEFAULT_THEME_DIRECTORY) then
       --print("Hold on. Copying example folders to make this easier...\n This make take a few seconds.")
       gprint(loc("op_copy_files"), 280, 280)
       wait()
-      recursive_copy("themes/" .. default_theme_dir, "themes/" .. prefix_of_ignored_dirs .. default_theme_dir)
+      recursive_copy(Theme.themeDirectoryPath .. consts.DEFAULT_THEME_DIRECTORY, Theme.themeDirectoryPath .. prefix_of_ignored_dirs .. consts.DEFAULT_THEME_DIRECTORY)
 
       -- Android can't easily copy into the save dir, so do it for them to help.
       recursive_copy("default_data/themes", "themes")
     end
 
-    ret = {show_readme, {"readme_themes.txt", 1}}
+    ret = {show_readme, {"readme_themes.md", 1}}
   end
 
   local function show_characters_readme()
-    ret = {show_readme, {"readme_characters.txt", 2}}
+    ret = {show_readme, {"readme_characters.md", 2}}
   end
 
   local function show_stages_readme()
-    ret = {show_readme, {"readme_stages.txt", 3}}
+    ret = {show_readme, {"readme_stages.md", 3}}
   end
 
   local function show_panels_readme()
@@ -992,6 +1007,10 @@ local function about_menu(button_idx)
     ret = {show_readme, {"readme_training.txt", 5}}
   end
 
+  local function show_installMods_readme()
+    ret = {show_readme, {"readme_installmods.md"}}
+  end
+
   local function show_system_info()
     ret = {
       function()
@@ -999,16 +1018,16 @@ local function about_menu(button_idx)
         reset_filters()
         local renderer_name, renderer_version, graphics_card_vendor, graphics_card_name = love.graphics.getRendererInfo()
         local sys_info = {}
-        sys_info[#sys_info + 1] = {name = "Operating System", value = love.system.getOS()} 
-        sys_info[#sys_info + 1] = {name = "Renderer", value = renderer_name.." "..renderer_version}
+        sys_info[#sys_info + 1] = {name = "Operating System", value = love.system.getOS()}
+        sys_info[#sys_info + 1] = {name = "Renderer", value = renderer_name .. " " .. renderer_version}
         sys_info[#sys_info + 1] = {name = "Graphics Card", value = graphics_card_name}
-        sys_info[#sys_info + 1] = {name = "LOVE Version", value = Game.loveVersionString()} 
-        sys_info[#sys_info + 1] = {name = "Panel Attack Engine Version", value = VERSION} 
-        sys_info[#sys_info + 1] = {name = "Panel Attack Release Version", value = GAME_UPDATER_GAME_VERSION} 
-        sys_info[#sys_info + 1] = {name = "Save Data Directory Path", value = love.filesystem.getSaveDirectory()}  
-        sys_info[#sys_info + 1] = {name = "Characters [Enabled/Total]", value = #characters_ids_for_current_theme.."/"..#characters_ids} 
-        sys_info[#sys_info + 1] = {name = "Stages [Enabled/Total]", value = #stages_ids_for_current_theme.."/"..#stages_ids} 
-        sys_info[#sys_info + 1] = {name = "Total Panel Sets", value = #panels_ids} 
+        sys_info[#sys_info + 1] = {name = "LOVE Version", value = Game.loveVersionString()}
+        sys_info[#sys_info + 1] = {name = "Panel Attack Engine Version", value = VERSION}
+        sys_info[#sys_info + 1] = {name = "Panel Attack Release Version", value = GAME_UPDATER_GAME_VERSION}
+        sys_info[#sys_info + 1] = {name = "Save Data Directory Path", value = love.filesystem.getSaveDirectory()}
+        sys_info[#sys_info + 1] = {name = "Characters [Enabled/Total]", value = #characters_ids_for_current_theme .. "/" .. #characters_ids}
+        sys_info[#sys_info + 1] = {name = "Stages [Enabled/Total]", value = #stages_ids_for_current_theme .. "/" .. #stages_ids}
+        sys_info[#sys_info + 1] = {name = "Total Panel Sets", value = #panels_ids}
         sys_info[#sys_info + 1] = {name = "Total Themes", value = #found_themes}
         local info_string = ""
         for index, info in ipairs(sys_info) do
@@ -1051,6 +1070,7 @@ local function about_menu(button_idx)
   aboutMenu:add_button(loc("op_about_stages"), show_stages_readme, goEscape)
   aboutMenu:add_button(loc("op_about_panels"), show_panels_readme, goEscape)
   aboutMenu:add_button("About Attack Files", show_attack_readme, goEscape)
+  aboutMenu:add_button("Installing Mods", show_installMods_readme, goEscape)
   aboutMenu:add_button("System Info", show_system_info, goEscape)
   aboutMenu:add_button(loc("back"), exitSettings, exitSettings)
 
@@ -1069,6 +1089,103 @@ local function about_menu(button_idx)
 
     if ret then
       aboutMenu:remove_self()
+      return unpack(ret)
+    end
+  end
+end
+
+local function userIDMenu(button_idx)
+  local ret = nil
+  local menu_x, menu_y = unpack(themes[config.theme].main_menu_screen_pos)
+  local userIDDirectories = FileUtil.getFilteredDirectoryItems("servers")
+  local userIDClickMenu
+  local currentButton
+
+  local function updateID()
+    ret = {
+      function()
+        local updateIDRet = nil
+        local id = read_user_id_file(userIDDirectories[currentButton])
+        love.keyboard.setTextInput(true) -- enables user to type
+        while true do
+          local to_print = "Enter User ID (or paste from clipboard)"
+          local line2 = id
+          if (love.timer.getTime() * 3) % 2 > 1 then
+            line2 = line2 .. "| "
+          end
+          gprintf(to_print, 0, canvas_height / 2, canvas_width, "center")
+          gprintf(line2, (canvas_width / 2) - 120, (canvas_height / 2) + 20)
+          wait()
+          variable_step(
+            function()
+              if this_frame_keys["escape"] then
+                updateIDRet = {userIDMenu, {currentButton}}
+              end
+              if menu_return_once() then
+                write_user_id_file(id, userIDDirectories[currentButton])
+                updateIDRet = {userIDMenu, {currentButton}}
+              end
+              if menu_backspace() then
+                -- Remove the last character.
+                -- This could be a UTF-8 character, so handle it properly.
+                local utf8offset = utf8.offset(id, -1)
+                if utf8offset then
+                  id = string.sub(id, 1, utf8offset - 1)
+                end
+              end
+              for _, v in ipairs(this_frame_unicodes) do
+                if v:match("%d") then
+                  id = id .. v
+                end
+              end
+              if (love.keyboard.isDown("rctrl") or love.keyboard.isDown("lctrl")) and keys["v"] then
+                local clipboardText = love.system.getClipboardText()
+                if clipboardText:match("%d") then
+                  id = clipboardText
+                end
+              end
+            end
+          )
+          if updateIDRet then
+            love.keyboard.setTextInput(false)
+            return unpack(updateIDRet)
+          end
+        end
+      end
+    }
+  end
+
+  local function goEscape()
+    userIDClickMenu:set_active_idx(#userIDClickMenu.buttons)
+  end
+
+  local function exitSettings()
+    ret = {options.main, {7}}
+  end
+
+  userIDClickMenu = Click_menu(menu_x, menu_y, nil, themes[config.theme].main_menu_max_height, 1)
+  for i = 1, #userIDDirectories do
+    userIDClickMenu:add_button(userIDDirectories[i], updateID, goEscape)
+  end
+  userIDClickMenu:add_button(loc("back"), exitSettings, exitSettings)
+
+  if button_idx then
+    userIDClickMenu:set_active_idx(button_idx)
+  end
+
+  while true do
+    gprintf("Keep these numbers secret, they are your password to the server. Only change this number if you have a previous number backed up or a developer recovered it for you.", 0, menu_y, nil, "center")
+    userIDClickMenu:draw()
+    wait()
+    variable_step(
+      function()
+        currentButton = userIDClickMenu.active_idx
+        userIDClickMenu:update()
+      end
+    )
+
+    if ret then
+      userIDClickMenu:remove_self()
       return unpack(ret)
     end
   end
@@ -1125,6 +1242,10 @@ function options.main(button_idx)
     ret = {about_menu}
   end
 
+  local function enterUserIDMenu()
+    ret = {userIDMenu}
+  end
+
   local function nextMenu()
     optionsMenu:selectNextIndex()
   end
@@ -1142,7 +1263,12 @@ function options.main(button_idx)
 
     write_conf_file()
 
-    if config.theme ~= memory_before_options_menu.theme then
+    local themeChanged = true
+    if memory_before_options_menu ~= nil and config.theme == memory_before_options_menu.theme then
+      themeChanged = false
+    end
+
+    if themeChanged then
       gprint(loc("op_reload_theme"), unpack(previousMenuPosition))
       wait()
       stop_the_music()
@@ -1151,22 +1277,18 @@ function options.main(button_idx)
       if themes[config.theme].musics["main"] then
         find_and_add_music(themes[config.theme].musics, "main")
       end
-    end
 
-    -- stages before characters since they are part of their loading
-    if config.theme ~= memory_before_options_menu.theme then
+      -- stages before characters since they are part of their loading
       gprint(loc("op_reload_stages"), unpack(themes[config.theme].main_menu_screen_pos))
       wait()
       stages_init()
-    end
 
-    if config.theme ~= memory_before_options_menu.theme then
       gprint(loc("op_reload_characters"), unpack(themes[config.theme].main_menu_screen_pos))
       wait()
       characters_init()
     end
 
-    if config.enable_analytics ~= memory_before_options_menu.enable_analytics then
+    if memory_before_options_menu == nil or config.enable_analytics ~= memory_before_options_menu.enable_analytics then
       gprint(loc("op_reload_analytics"), unpack(themes[config.theme].main_menu_screen_pos))
       wait()
       analytics.init()
@@ -1175,7 +1297,6 @@ function options.main(button_idx)
     apply_config_volume()
 
     memory_before_options_menu = nil
-    normal_music_for_sound_option = nil
     ret = {main_select_mode}
   end
 
@@ -1186,6 +1307,7 @@ function options.main(button_idx)
   optionsMenu:add_button(loc("op_audio"), enter_audio_menu, goEscape)
   optionsMenu:add_button(loc("op_debug"), enter_debug_menu, goEscape)
   optionsMenu:add_button(loc("op_about"), enter_about_menu, goEscape)
+  optionsMenu:add_button("Modify User ID", enterUserIDMenu, goEscape)
   optionsMenu:add_button(loc("back"), exitSettings, exitSettings)
   update_language()
 
@@ -1193,14 +1315,17 @@ function options.main(button_idx)
     optionsMenu:set_active_idx(button_idx)
   else
     found_themes = {}
-    for k, v in ipairs(FileUtil.getFilteredDirectoryItems("themes")) do
-      if love.filesystem.getInfo("themes/" .. v) and v:sub(0, prefix_of_ignored_dirs:len()) ~= prefix_of_ignored_dirs then
+    for _, v in ipairs(FileUtil.getFilteredDirectoryItems("themes")) do
+      if love.filesystem.getInfo(Theme.themeDirectoryPath .. v) and love.filesystem.getInfo(Theme.themeDirectoryPath .. v .. "/config.json") then
         found_themes[#found_themes + 1] = v
         if config.theme == v then
           theme_index = #found_themes
         end
       end
     end
+  end
+
+  if memory_before_options_menu == nil then
     memory_before_options_menu = {
       theme = config.theme,
       --this one is actually updated with the menu and change upon leaving, be careful!
